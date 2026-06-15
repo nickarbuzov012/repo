@@ -11,6 +11,7 @@ async function bootstrap(): Promise<void> {
     .setTitle('Users API')
     .setDescription('REST API for users, auth and profiles')
     .setVersion('0.1.0')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

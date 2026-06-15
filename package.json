@@ -8,7 +8,7 @@
     "build": "nest build",
     "test": "jest",
     "migration:run": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:run",
-    "migration:generate": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:generate src/database/migrations/Migration"
+    "migration:generate": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:generate"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
