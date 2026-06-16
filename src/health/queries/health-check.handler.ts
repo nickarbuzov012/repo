@@ -1,15 +1,9 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-
-export type HealthStatus = 'ok' | 'error';
+import { HealthCheckResponse } from '../health.contracts';
 
 export class HealthCheckQuery {}
-
-export interface HealthCheckResponse {
-  status: HealthStatus;
-  database: HealthStatus;
-}
 
 @QueryHandler(HealthCheckQuery)
 export class HealthCheckHandler

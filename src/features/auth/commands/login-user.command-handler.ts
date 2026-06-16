@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -23,12 +23,8 @@ export class LoginUserHandler
   ) {}
 
   async execute(command: LoginUserCommand): Promise<AuthResponse> {
-    const login = command.payload.login?.trim();
+    const login = command.payload.login;
     const password = command.payload.password;
-
-    if (!login || !password) {
-      throw new BadRequestException('Login and password are required');
-    }
 
     const user = await this.usersRepository.findOne({ where: { login } });
 

@@ -1,20 +1,28 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiOkResponse,
-  ApiTags,
-  ApiUnauthorizedResponse,
-} from '@nestjs/swagger';
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { ZodResponseInterceptor } from '../../common/serialization/zod-response.interceptor';
+import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { AuthRequestUser } from './auth-request-user';
 import { AuthGuard } from './auth.guard';
 import {
   AuthResponse,
+  AuthResponseSchema,
   LoginRequest,
+  LoginRequestSchema,
   MeResponse,
+  MeResponseSchema,
   RefreshTokenRequest,
+  RefreshTokenRequestSchema,
   RegisterRequest,
+  RegisterRequestSchema,
 } from './contracts/auth.contracts';
 import { LoginUserCommand } from './commands/login-user.command-handler';
 import { RefreshTokenCommand } from './commands/refresh-token.command-handler';
@@ -25,7 +33,6 @@ interface AuthenticatedHttpRequest {
   user: AuthRequestUser;
 }
 
-@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -34,72 +41,31 @@ export class AuthController {
   ) {}
 
   @Post('registration')
-  @ApiBody({
-    schema: {
-      example: {
-        login: 'john',
-        email: 'john@example.com',
-        password: 'password123',
-        age: 25,
-        description: 'About John',
-      },
-    },
-  })
-  @ApiOkResponse({
-    schema: {
-      example: {
-        access_token: 'access.jwt.token',
-        refresh_token: 'refresh.jwt.token',
-      },
-    },
-  })
-  async registration(@Body() body: RegisterRequest): Promise<AuthResponse> {
+  @UseInterceptors(new ZodResponseInterceptor(AuthResponseSchema))
+  async registration(
+    @Body(new ZodValidationPipe(RegisterRequestSchema)) body: RegisterRequest,
+  ): Promise<AuthResponse> {
     return this.commandBus.execute<RegisterUserCommand, AuthResponse>(
       new RegisterUserCommand(body),
     );
   }
 
   @Post('login')
-  @ApiBody({
-    schema: {
-      example: {
-        login: 'john',
-        password: 'password123',
-      },
-    },
-  })
-  @ApiOkResponse({
-    schema: {
-      example: {
-        access_token: 'access.jwt.token',
-        refresh_token: 'refresh.jwt.token',
-      },
-    },
-  })
-  @ApiUnauthorizedResponse({ description: 'Invalid login or password' })
-  async login(@Body() body: LoginRequest): Promise<AuthResponse> {
+  @UseInterceptors(new ZodResponseInterceptor(AuthResponseSchema))
+  async login(
+    @Body(new ZodValidationPipe(LoginRequestSchema)) body: LoginRequest,
+  ): Promise<AuthResponse> {
     return this.commandBus.execute<LoginUserCommand, AuthResponse>(
       new LoginUserCommand(body),
     );
   }
 
   @Post('refresh-token')
-  @ApiBody({
-    schema: {
-      example: {
-        refresh_token: 'refresh.jwt.token',
-      },
-    },
-  })
-  @ApiOkResponse({
-    schema: {
-      example: {
-        access_token: 'new.access.jwt.token',
-        refresh_token: 'new.refresh.jwt.token',
-      },
-    },
-  })
-  async refreshToken(@Body() body: RefreshTokenRequest): Promise<AuthResponse> {
+  @UseInterceptors(new ZodResponseInterceptor(AuthResponseSchema))
+  async refreshToken(
+    @Body(new ZodValidationPipe(RefreshTokenRequestSchema))
+    body: RefreshTokenRequest,
+  ): Promise<AuthResponse> {
     return this.commandBus.execute<RefreshTokenCommand, AuthResponse>(
       new RefreshTokenCommand(body),
     );
@@ -107,21 +73,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(AuthGuard)
-  @ApiBearerAuth()
-  @ApiOkResponse({
-    schema: {
-      example: {
-        id: '9f8c7f74-4eb1-4a39-85f6-9bce59f61a40',
-        login: 'john',
-        email: 'john@example.com',
-        age: 25,
-        description: 'About John',
-        role: 'user',
-        createdAt: '2026-06-12T00:00:00.000Z',
-        updatedAt: '2026-06-12T00:00:00.000Z',
-      },
-    },
-  })
+  @UseInterceptors(new ZodResponseInterceptor(MeResponseSchema))
   async me(@Req() request: AuthenticatedHttpRequest): Promise<MeResponse> {
     return this.queryBus.execute<GetMeQuery, MeResponse>(
       new GetMeQuery(request.user.id),

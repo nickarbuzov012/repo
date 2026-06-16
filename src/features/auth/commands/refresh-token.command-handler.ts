@@ -1,4 +1,4 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -28,10 +28,6 @@ export class RefreshTokenHandler
 
   async execute(command: RefreshTokenCommand): Promise<AuthResponse> {
     const refreshToken = command.payload.refresh_token;
-
-    if (!refreshToken) {
-      throw new BadRequestException('Refresh token is required');
-    }
 
     const payload = this.tokenService.verifyRefreshToken(refreshToken);
 
