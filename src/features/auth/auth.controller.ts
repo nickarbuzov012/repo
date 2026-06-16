@@ -9,20 +9,16 @@ import {
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { ZodResponseInterceptor } from '../../common/serialization/zod-response.interceptor';
-import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { AuthRequestUser } from './auth-request-user';
 import { AuthGuard } from './auth.guard';
 import {
   AuthResponse,
   AuthResponseSchema,
   LoginRequest,
-  LoginRequestSchema,
   MeResponse,
   MeResponseSchema,
   RefreshTokenRequest,
-  RefreshTokenRequestSchema,
   RegisterRequest,
-  RegisterRequestSchema,
 } from './contracts/auth.contracts';
 import { LoginUserCommand } from './commands/login-user.command-handler';
 import { RefreshTokenCommand } from './commands/refresh-token.command-handler';
@@ -43,7 +39,7 @@ export class AuthController {
   @Post('registration')
   @UseInterceptors(new ZodResponseInterceptor(AuthResponseSchema))
   async registration(
-    @Body(new ZodValidationPipe(RegisterRequestSchema)) body: RegisterRequest,
+    @Body() body: RegisterRequest,
   ): Promise<AuthResponse> {
     return this.commandBus.execute<RegisterUserCommand, AuthResponse>(
       new RegisterUserCommand(body),
@@ -53,7 +49,7 @@ export class AuthController {
   @Post('login')
   @UseInterceptors(new ZodResponseInterceptor(AuthResponseSchema))
   async login(
-    @Body(new ZodValidationPipe(LoginRequestSchema)) body: LoginRequest,
+    @Body() body: LoginRequest,
   ): Promise<AuthResponse> {
     return this.commandBus.execute<LoginUserCommand, AuthResponse>(
       new LoginUserCommand(body),
@@ -63,8 +59,7 @@ export class AuthController {
   @Post('refresh-token')
   @UseInterceptors(new ZodResponseInterceptor(AuthResponseSchema))
   async refreshToken(
-    @Body(new ZodValidationPipe(RefreshTokenRequestSchema))
-    body: RefreshTokenRequest,
+    @Body() body: RefreshTokenRequest,
   ): Promise<AuthResponse> {
     return this.commandBus.execute<RefreshTokenCommand, AuthResponse>(
       new RefreshTokenCommand(body),

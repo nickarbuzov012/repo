@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '../infrastructure/documentation/zod';
 
 export const HealthCheckResponseSchema = z
   .object({

@@ -3,17 +3,12 @@ import {
   OpenApiGeneratorV3,
 } from '@asteasolutions/zod-to-openapi';
 import { OpenAPIObject } from '@nestjs/swagger';
-import { z } from 'zod';
+import { z } from './zod';
 import {
-  AuthResponseSchema,
-  LoginRequestSchema,
-  MeResponseSchema,
-  RefreshTokenRequestSchema,
-  RegisterRequestSchema,
-} from '../../features/auth/contracts/auth.contracts';
-import { HealthCheckResponseSchema } from '../../health/health.contracts';
-
-const registry = new OpenAPIRegistry();
+  ZResponseConfig,
+  ZRouteConfig,
+  zRegistry,
+} from '../validation/z-registry';
 
 const ErrorResponseSchema = z
   .object({
@@ -23,12 +18,6 @@ const ErrorResponseSchema = z
   })
   .meta({ id: 'ErrorResponse' });
 
-registry.registerComponent('securitySchemes', 'bearer', {
-  type: 'http',
-  scheme: 'bearer',
-  bearerFormat: 'JWT',
-});
-
 function jsonBody(schema: z.ZodType) {
   return {
     required: true,
@@ -36,71 +25,26 @@ function jsonBody(schema: z.ZodType) {
   };
 }
 
-function jsonResponse(description: string, schema: z.ZodType) {
+function jsonResponse(description: string, schema: unknown) {
   return {
     description,
-    content: { 'application/json': { schema } },
+    content: { 'application/json': { schema: schema as z.ZodType } },
   };
 }
 
-registry.registerPath({
-  method: 'post',
-  path: '/api/auth/registration',
-  tags: ['auth'],
-  request: { body: jsonBody(RegisterRequestSchema) },
-  responses: {
-    201: jsonResponse('User registered', AuthResponseSchema),
-    400: jsonResponse('Invalid request', ErrorResponseSchema),
-    409: jsonResponse('Login or email already exists', ErrorResponseSchema),
-  },
-});
-
-registry.registerPath({
-  method: 'post',
-  path: '/api/auth/login',
-  tags: ['auth'],
-  request: { body: jsonBody(LoginRequestSchema) },
-  responses: {
-    201: jsonResponse('Authenticated', AuthResponseSchema),
-    400: jsonResponse('Invalid request', ErrorResponseSchema),
-    401: jsonResponse('Invalid credentials', ErrorResponseSchema),
-  },
-});
-
-registry.registerPath({
-  method: 'post',
-  path: '/api/auth/refresh-token',
-  tags: ['auth'],
-  request: { body: jsonBody(RefreshTokenRequestSchema) },
-  responses: {
-    201: jsonResponse('Token pair refreshed', AuthResponseSchema),
-    400: jsonResponse('Invalid request', ErrorResponseSchema),
-    401: jsonResponse('Invalid or revoked refresh token', ErrorResponseSchema),
-  },
-});
-
-registry.registerPath({
-  method: 'get',
-  path: '/api/auth/me',
-  tags: ['auth'],
-  security: [{ bearer: [] }],
-  responses: {
-    200: jsonResponse('Current user', MeResponseSchema),
-    401: jsonResponse('Access token is missing or invalid', ErrorResponseSchema),
-    404: jsonResponse('User not found', ErrorResponseSchema),
-  },
-});
-
-registry.registerPath({
-  method: 'get',
-  path: '/api/health',
-  tags: ['health'],
-  responses: {
-    200: jsonResponse('Application health', HealthCheckResponseSchema),
-  },
-});
-
 export function createOpenApiDocument(): OpenAPIObject {
+  const registry = new OpenAPIRegistry();
+
+  registry.registerComponent('securitySchemes', 'bearerAuth', {
+    type: 'http',
+    scheme: 'bearer',
+    bearerFormat: 'JWT',
+  });
+
+  for (const [route, config] of Object.entries(zRegistry)) {
+    registerZRoute(registry, route, config);
+  }
+
   const generator = new OpenApiGeneratorV3(registry.definitions);
 
   return generator.generateDocument({
@@ -111,4 +55,65 @@ export function createOpenApiDocument(): OpenAPIObject {
       version: '0.1.0',
     },
   }) as OpenAPIObject;
+}
+
+function registerZRoute(
+  registry: OpenAPIRegistry,
+  route: string,
+  config: ZRouteConfig,
+): void {
+  const [method, ...pathParts] = route.split(' ');
+  const path = `/api${pathParts.join(' ')}`;
+  const responses = createResponses(config);
+
+  registry.registerPath({
+    method: method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete',
+    path: toOpenApiPath(path),
+    tags: config.tags,
+    summary: config.summary,
+    request: config.body ? { body: jsonBody(config.body) } : undefined,
+    responses,
+    security: config.auth
+      ? [{ bearerAuth: [] }]
+      : config.authOptional
+        ? [{ bearerAuth: [] }, {}]
+        : undefined,
+  });
+}
+
+function createResponses(config: ZRouteConfig): Record<string, unknown> {
+  const responses: Record<string, unknown> = {};
+
+  for (const item of toResponseList(config.res)) {
+    const status = String(item.status ?? 200);
+    responses[status] = jsonResponse(item.description ?? 'Success', item.schema);
+  }
+
+  responses['400'] = jsonResponse('Validation error', ErrorResponseSchema);
+
+  if (config.auth || config.authOptional) {
+    responses['401'] = jsonResponse('Unauthorized', ErrorResponseSchema);
+  }
+
+  return responses;
+}
+
+function toResponseList(input: ZRouteConfig['res']): ZResponseConfig[] {
+  if (!input) {
+    return [];
+  }
+
+  if (Array.isArray(input)) {
+    return input;
+  }
+
+  if (typeof input === 'object' && 'schema' in input) {
+    return [input as ZResponseConfig];
+  }
+
+  return [{ status: 200, schema: input }];
+}
+
+function toOpenApiPath(path: string): string {
+  return path.replace(/:([^/]+)/g, '{$1}');
 }

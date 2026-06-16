@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '../../../infrastructure/documentation/zod';
 import { UserRole } from '../../users/entities/user.entity';
 
 export const RegisterRequestSchema = z

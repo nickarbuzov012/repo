@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './features/auth/auth.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { ZodRouteValidationMiddleware } from './infrastructure/validation/zod-route.middleware';
 
 @Module({
   imports: [
@@ -14,4 +15,8 @@ import { HealthModule } from './health/health.module';
     AuthModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(ZodRouteValidationMiddleware).forRoutes('*');
+  }
+}
