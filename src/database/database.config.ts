@@ -4,6 +4,8 @@ import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 export function createTypeOrmOptions(
   configService: ConfigService,
 ): TypeOrmModuleOptions {
+  const isTest = configService.get<string>('NODE_ENV') === 'test';
+
   return {
     type: 'postgres',
     host: configService.getOrThrow<string>('DATABASE_HOST'),
@@ -13,7 +15,10 @@ export function createTypeOrmOptions(
     database: configService.getOrThrow<string>('DATABASE_NAME'),
     autoLoadEntities: true,
     synchronize: false,
-    migrationsRun: false,
-    migrations: ['dist/database/migrations/*.js'],
+    dropSchema: isTest,
+    migrationsRun: isTest,
+    migrations: [
+      isTest ? 'src/database/migrations/*.ts' : 'dist/database/migrations/*.js',
+    ],
   };
 }
