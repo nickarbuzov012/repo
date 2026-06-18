@@ -2,9 +2,9 @@ import { UnauthorizedException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AuthResponse, LoginRequest } from '../contracts/auth.contracts';
+import { LoginRequest } from '../contracts/auth.contracts';
 import { PasswordService } from '../services/password.service';
-import { TokenService } from '../services/token.service';
+import { TokenPair, TokenService } from '../services/token.service';
 import { UserEntity } from '../../users/entities/user.entity';
 
 export class LoginUserCommand {
@@ -13,7 +13,7 @@ export class LoginUserCommand {
 
 @CommandHandler(LoginUserCommand)
 export class LoginUserHandler
-  implements ICommandHandler<LoginUserCommand, AuthResponse>
+  implements ICommandHandler<LoginUserCommand, TokenPair>
 {
   constructor(
     @InjectRepository(UserEntity)
@@ -22,7 +22,7 @@ export class LoginUserHandler
     private readonly tokenService: TokenService,
   ) {}
 
-  async execute(command: LoginUserCommand): Promise<AuthResponse> {
+  async execute(command: LoginUserCommand): Promise<TokenPair> {
     const login = command.payload.login;
     const password = command.payload.password;
 
@@ -41,6 +41,6 @@ export class LoginUserHandler
       throw new UnauthorizedException('Invalid login or password');
     }
 
-    return this.tokenService.issueTokenPair(user.id, user.role);
+    return this.tokenService.issueTokenPair(user.id, user.roles);
   }
 }

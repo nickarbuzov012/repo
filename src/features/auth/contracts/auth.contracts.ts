@@ -31,14 +31,26 @@ export const LoginRequestSchema = z
 
 export const RefreshTokenRequestSchema = z
   .strictObject({
-    refresh_token: z.string().min(1).meta({ example: 'refresh.jwt.token' }),
+    refresh_token: z
+      .string()
+      .min(1)
+      .optional()
+      .meta({ example: 'refresh.jwt.token' }),
   })
   .meta({ id: 'RefreshTokenRequest' });
+
+export const RefreshTokenCookieSchema = z
+  .object({
+    refresh_token: z
+      .string()
+      .min(1)
+      .meta({ example: 'refresh.jwt.token' }),
+  })
+  .meta({ id: 'RefreshTokenCookie' });
 
 export const AuthResponseSchema = z
   .object({
     access_token: z.string().meta({ example: 'access.jwt.token' }),
-    refresh_token: z.string().meta({ example: 'refresh.jwt.token' }),
   })
   .meta({ id: 'AuthResponse' });
 
@@ -49,7 +61,7 @@ export const MeResponseSchema = z
     email: z.email().meta({ example: 'john@example.com' }),
     age: z.number().int().meta({ example: 25 }),
     description: z.string().meta({ example: 'About John' }),
-    role: z.enum(UserRole).meta({ example: UserRole.User }),
+    roles: z.array(z.enum(UserRole)).meta({ example: [UserRole.User] }),
     createdAt: z.date().transform((date) => date.toISOString()),
     updatedAt: z.date().transform((date) => date.toISOString()),
   })

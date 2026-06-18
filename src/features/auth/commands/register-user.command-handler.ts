@@ -2,9 +2,9 @@ import { ConflictException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AuthResponse, RegisterRequest } from '../contracts/auth.contracts';
+import { RegisterRequest } from '../contracts/auth.contracts';
 import { PasswordService } from '../services/password.service';
-import { TokenService } from '../services/token.service';
+import { TokenPair, TokenService } from '../services/token.service';
 import { UserEntity, UserRole } from '../../users/entities/user.entity';
 
 export class RegisterUserCommand {
@@ -13,7 +13,7 @@ export class RegisterUserCommand {
 
 @CommandHandler(RegisterUserCommand)
 export class RegisterUserHandler
-  implements ICommandHandler<RegisterUserCommand, AuthResponse>
+  implements ICommandHandler<RegisterUserCommand, TokenPair>
 {
   constructor(
     @InjectRepository(UserEntity)
@@ -22,7 +22,7 @@ export class RegisterUserHandler
     private readonly tokenService: TokenService,
   ) {}
 
-  async execute(command: RegisterUserCommand): Promise<AuthResponse> {
+  async execute(command: RegisterUserCommand): Promise<TokenPair> {
     const payload = command.payload;
 
     const existingUser = await this.usersRepository.findOne({
@@ -36,12 +36,12 @@ export class RegisterUserHandler
 
     const user = this.usersRepository.create({
       ...payload,
-      role: UserRole.User,
+      roles: [UserRole.User],
       passwordHash: await this.passwordService.hash(payload.password),
     });
 
     await this.usersRepository.save(user);
 
-    return this.tokenService.issueTokenPair(user.id, user.role);
+    return this.tokenService.issueTokenPair(user.id, user.roles);
   }
 }

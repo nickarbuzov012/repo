@@ -32,8 +32,13 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 1000 })
   description: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.User })
-  role: UserRole;
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    array: true,
+    default: [UserRole.User],
+  })
+  roles: UserRole[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

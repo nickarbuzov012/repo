@@ -2,6 +2,7 @@ import {
   AuthResponseSchema,
   LoginRequestSchema,
   MeResponseSchema,
+  RefreshTokenCookieSchema,
   RefreshTokenRequestSchema,
   RegisterRequestSchema,
 } from '../contracts/auth.contracts';
@@ -17,6 +18,7 @@ export const validators = {
   },
   refreshToken: {
     body: RefreshTokenRequestSchema,
+    cookies: RefreshTokenCookieSchema,
     res: AuthResponseSchema,
   },
   me: {
@@ -42,7 +44,8 @@ export const authZSlice = {
   'POST /auth/refresh-token': {
     tags,
     summary: 'Refresh token pair',
-    body: validators.refreshToken.body,
+    cookies: validators.refreshToken.cookies,
+    unauthorized: true,
     res: { status: 201, schema: validators.refreshToken.res },
   },
   'GET /auth/me': {

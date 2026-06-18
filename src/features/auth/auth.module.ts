@@ -33,5 +33,6 @@ const queryHandlers = [GetMeHandler];
     ...commandHandlers,
     ...queryHandlers,
   ],
+  exports: [AuthGuard, PasswordService, TokenService],
 })
 export class AuthModule {}

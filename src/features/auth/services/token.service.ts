@@ -7,7 +7,7 @@ export type TokenType = 'access' | 'refresh';
 
 export interface AuthTokenPayload {
   sub: string;
-  role: UserRole;
+  roles: UserRole[];
   type: TokenType;
   jti?: string;
   exp: number;
@@ -29,20 +29,20 @@ export interface RefreshTokenIssue {
 export class TokenService {
   constructor(private readonly configService: ConfigService) {}
 
-  issueTokenPair(userId: string, role: UserRole): TokenPair {
-    const refreshToken = this.issueRefreshToken(userId, role);
+  issueTokenPair(userId: string, roles: UserRole[]): TokenPair {
+    const refreshToken = this.issueRefreshToken(userId, roles);
 
     return {
-      access_token: this.issueAccessToken(userId, role),
+      access_token: this.issueAccessToken(userId, roles),
       refresh_token: refreshToken.token,
     };
   }
 
-  issueAccessToken(userId: string, role: UserRole): string {
+  issueAccessToken(userId: string, roles: UserRole[]): string {
     return this.sign(
       {
         sub: userId,
-        role,
+        roles,
         type: 'access',
       },
       this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
@@ -50,12 +50,12 @@ export class TokenService {
     ).token;
   }
 
-  issueRefreshToken(userId: string, role: UserRole): RefreshTokenIssue {
+  issueRefreshToken(userId: string, roles: UserRole[]): RefreshTokenIssue {
     const tokenId = randomUUID();
     const issued = this.sign(
       {
         sub: userId,
-        role,
+        roles,
         type: 'refresh',
         jti: tokenId,
       },

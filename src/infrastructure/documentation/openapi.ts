@@ -1,6 +1,7 @@
 import {
   OpenAPIRegistry,
   OpenApiGeneratorV3,
+  RouteConfig,
 } from '@asteasolutions/zod-to-openapi';
 import { OpenAPIObject } from '@nestjs/swagger';
 import { z } from './zod';
@@ -13,7 +14,19 @@ import {
 const ErrorResponseSchema = z
   .object({
     statusCode: z.number().int(),
-    message: z.union([z.string(), z.array(z.string())]),
+    message: z.union([
+      z.string(),
+      z.array(z.string()),
+      z.object({
+        message: z.string(),
+        errors: z.array(
+          z.object({
+            path: z.string(),
+            message: z.string(),
+          }),
+        ),
+      }),
+    ]),
     error: z.string().optional(),
   })
   .meta({ id: 'ErrorResponse' });
@@ -23,6 +36,28 @@ function jsonBody(schema: z.ZodType) {
     required: true,
     content: { 'application/json': { schema } },
   };
+}
+
+function request(config: ZRouteConfig): RouteConfig['request'] {
+  const result: RouteConfig['request'] = {};
+
+  if (config.body) {
+    result.body = jsonBody(config.body);
+  }
+
+  if (config.query) {
+    result.query = config.query;
+  }
+
+  if (config.params) {
+    result.params = config.params;
+  }
+
+  if (config.cookies) {
+    result.cookies = config.cookies;
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 function jsonResponse(description: string, schema: unknown) {
@@ -71,7 +106,7 @@ function registerZRoute(
     path: toOpenApiPath(path),
     tags: config.tags,
     summary: config.summary,
-    request: config.body ? { body: jsonBody(config.body) } : undefined,
+    request: request(config),
     responses,
     security: config.auth
       ? [{ bearerAuth: [] }]
@@ -81,8 +116,8 @@ function registerZRoute(
   });
 }
 
-function createResponses(config: ZRouteConfig): Record<string, unknown> {
-  const responses: Record<string, unknown> = {};
+function createResponses(config: ZRouteConfig): RouteConfig['responses'] {
+  const responses: RouteConfig['responses'] = {};
 
   for (const item of toResponseList(config.res)) {
     const status = String(item.status ?? 200);
@@ -91,7 +126,7 @@ function createResponses(config: ZRouteConfig): Record<string, unknown> {
 
   responses['400'] = jsonResponse('Validation error', ErrorResponseSchema);
 
-  if (config.auth || config.authOptional) {
+  if (config.auth || config.authOptional || config.unauthorized) {
     responses['401'] = jsonResponse('Unauthorized', ErrorResponseSchema);
   }
 

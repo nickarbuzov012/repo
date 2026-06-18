@@ -2,21 +2,17 @@ import { UnauthorizedException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  AuthResponse,
-  RefreshTokenRequest,
-} from '../contracts/auth.contracts';
 import { RevokedRefreshTokenEntity } from '../entities/revoked-refresh-token.entity';
-import { TokenService } from '../services/token.service';
+import { TokenPair, TokenService } from '../services/token.service';
 import { UserEntity } from '../../users/entities/user.entity';
 
 export class RefreshTokenCommand {
-  constructor(public readonly payload: RefreshTokenRequest) {}
+  constructor(public readonly refreshToken: string) {}
 }
 
 @CommandHandler(RefreshTokenCommand)
 export class RefreshTokenHandler
-  implements ICommandHandler<RefreshTokenCommand, AuthResponse>
+  implements ICommandHandler<RefreshTokenCommand, TokenPair>
 {
   constructor(
     @InjectRepository(UserEntity)
@@ -26,10 +22,8 @@ export class RefreshTokenHandler
     private readonly tokenService: TokenService,
   ) {}
 
-  async execute(command: RefreshTokenCommand): Promise<AuthResponse> {
-    const refreshToken = command.payload.refresh_token;
-
-    const payload = this.tokenService.verifyRefreshToken(refreshToken);
+  async execute(command: RefreshTokenCommand): Promise<TokenPair> {
+    const payload = this.tokenService.verifyRefreshToken(command.refreshToken);
 
     const revokedToken = await this.revokedTokensRepository.findOne({
       where: { tokenId: payload.jti },
@@ -55,6 +49,6 @@ export class RefreshTokenHandler
       }),
     );
 
-    return this.tokenService.issueTokenPair(user.id, user.role);
+    return this.tokenService.issueTokenPair(user.id, user.roles);
   }
 }

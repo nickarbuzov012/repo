@@ -20,7 +20,7 @@ export class CreateUsersAndRevokedRefreshTokens1718150400000
         "password_hash" character varying(255) NOT NULL,
         "age" integer NOT NULL,
         "description" character varying(1000) NOT NULL,
-        "role" "public"."users_role_enum" NOT NULL DEFAULT 'user',
+        "roles" "public"."users_role_enum"[] NOT NULL DEFAULT ARRAY['user']::"public"."users_role_enum"[],
         "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         "deleted_at" TIMESTAMP WITH TIME ZONE,

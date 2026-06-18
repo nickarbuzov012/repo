@@ -31,7 +31,7 @@ export class GetMeHandler implements IQueryHandler<GetMeQuery, MeResponse> {
       email: user.email,
       age: user.age,
       description: user.description,
-      role: user.role,
+      roles: user.roles,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
