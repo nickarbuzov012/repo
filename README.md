@@ -1,6 +1,7 @@
 ﻿# Users API
 
-REST API на NestJS, PostgreSQL, TypeORM и CQRS.
+REST API на NestJS, PostgreSQL, TypeORM и CQRS. Локальная инфраструктура также
+включает Redis и совместимое с S3 объектное хранилище MinIO.
 
 ## Требования
 
@@ -29,7 +30,7 @@ cp .env.example .env
 Copy-Item .env.example .env
 ```
 
-## Запуск PostgreSQL и pgAdmin
+## Запуск инфраструктуры
 
 Запустить инфраструктуру:
 
@@ -56,6 +57,22 @@ pgAdmin:
 - URL: `http://localhost:${PGADMIN_PORT}`
 - email: значение `PGADMIN_DEFAULT_EMAIL` из `.env`
 - password: значение `PGADMIN_DEFAULT_PASSWORD` из `.env`
+
+Redis:
+
+- host: `localhost`
+- port: значение `REDIS_PORT` из `.env`
+
+MinIO:
+
+- S3 endpoint: значение `MINIO_ENDPOINT` из `.env`
+- console: `http://localhost:${MINIO_CONSOLE_PORT}`
+- access key: значение `MINIO_ACCESS_KEY` из `.env`
+- secret key: значение `MINIO_SECRET_KEY` из `.env`
+- bucket: значение `MINIO_BUCKET` из `.env`
+
+Bucket создаётся приложением лениво перед первой операцией загрузки. В базе
+данных должны храниться только object keys, без endpoint или домена MinIO.
 
 Для подключения сервера в pgAdmin:
 
@@ -128,6 +145,7 @@ docker compose up -d
 
 ```bash
 npm run build
+npm run lint
 npm test
 ```
 
@@ -136,3 +154,4 @@ npm test
 - `GET http://localhost:3000/api/health`
 - `http://localhost:3000/docs`
 - `http://localhost:5050`
+- `http://localhost:9001`

@@ -6,10 +6,14 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "build": "nest build",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
+    "lint:fix": "eslint \"{src,test}/**/*.ts\" --fix",
+    "format": "prettier --write \"{src,test}/**/*.ts\" \"*.{json,md,yml,yaml}\"",
     "test": "jest --config test/jest-e2e.json --runInBand",
     "test:e2e": "jest --config test/jest-e2e.json --runInBand",
     "migration:run": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:run",
-    "migration:generate": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:generate"
+    "migration:generate": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:generate",
+    "prepare": "husky"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.5.0",
@@ -38,5 +42,12 @@
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
+  },
+  "lint-staged": {
+    "*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": "prettier --write"
   }
 }
