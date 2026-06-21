@@ -25,6 +25,14 @@ interface UsersListResponseBody {
   pages: number;
 }
 
+interface AvatarResponseBody {
+  id: string;
+  fileName: string;
+  mimeType: 'image/jpeg' | 'image/png';
+  size: number;
+  createdAt: string;
+}
+
 const registerPayload = {
   login: 'john',
   email: 'John@example.com',
@@ -46,6 +54,31 @@ async function registerUser(
 
   expect(response.status).toBe(201);
   return response.body;
+}
+
+async function uploadAvatar(
+  baseUrl: string,
+  accessToken: string,
+  mimeType = 'image/png',
+): Promise<{ status: number; body: AvatarResponseBody }> {
+  const form = new FormData();
+  form.append(
+    'file',
+    new Blob([Buffer.from('avatar-content')], { type: mimeType }),
+    mimeType === 'image/png' ? 'avatar.png' : 'avatar.txt',
+  );
+
+  const response = await fetch(`${baseUrl}/api/profile/my/avatars`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${accessToken}` },
+    body: form,
+  });
+  const text = await response.text();
+
+  return {
+    status: response.status,
+    body: (text ? JSON.parse(text) : undefined) as AvatarResponseBody,
+  };
 }
 
 function expectRefreshCookie(response: { headers: Headers }): string {
@@ -514,5 +547,93 @@ describe('application endpoints (e2e)', () => {
     );
 
     expect(loginDeleted.status).toBe(401);
+  });
+
+  it('uploads at most five active avatars and soft deletes only owned avatars', async () => {
+    const owner = await registerUser(testApp.baseUrl, {
+      login: 'avatar-owner',
+      email: 'avatar-owner@example.com',
+      password: 'password123',
+      age: 24,
+      description: 'Avatar owner',
+    });
+    const stranger = await registerUser(testApp.baseUrl, {
+      login: 'avatar-stranger',
+      email: 'avatar-stranger@example.com',
+      password: 'password123',
+      age: 27,
+      description: 'Avatar stranger',
+    });
+
+    const avatars: AvatarResponseBody[] = [];
+
+    for (let index = 0; index < 5; index += 1) {
+      const upload = await uploadAvatar(testApp.baseUrl, owner.access_token);
+
+      expect(upload.status).toBe(201);
+      expect(upload.body).toMatchObject({
+        id: expect.any(String),
+        fileName: expect.stringMatching(/\.png$/),
+        mimeType: 'image/png',
+        size: expect.any(Number),
+        createdAt: expect.any(String),
+      });
+      avatars.push(upload.body);
+    }
+
+    const sixthUpload = await uploadAvatar(
+      testApp.baseUrl,
+      owner.access_token,
+    );
+    expect(sixthUpload.status).toBe(409);
+
+    const unsupportedFile = await uploadAvatar(
+      testApp.baseUrl,
+      owner.access_token,
+      'text/plain',
+    );
+    expect(unsupportedFile.status).toBe(400);
+
+    const foreignDelete = await requestJson(
+      testApp.baseUrl,
+      'DELETE',
+      `/api/profile/my/avatars/${avatars[0].id}`,
+      {
+        headers: {
+          authorization: `Bearer ${stranger.access_token}`,
+        },
+      },
+    );
+    expect(foreignDelete.status).toBe(404);
+
+    const ownerDelete = await requestJson(
+      testApp.baseUrl,
+      'DELETE',
+      `/api/profile/my/avatars/${avatars[0].id}`,
+      {
+        headers: {
+          authorization: `Bearer ${owner.access_token}`,
+        },
+      },
+    );
+    expect(ownerDelete.status).toBe(204);
+
+    const replacement = await uploadAvatar(
+      testApp.baseUrl,
+      owner.access_token,
+    );
+    expect(replacement.status).toBe(201);
+
+    const repeatedDelete = await requestJson(
+      testApp.baseUrl,
+      'DELETE',
+      `/api/profile/my/avatars/${avatars[0].id}`,
+      {
+        headers: {
+          authorization: `Bearer ${owner.access_token}`,
+        },
+      },
+    );
+    expect(repeatedDelete.status).toBe(404);
   });
 });

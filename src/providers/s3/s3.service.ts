@@ -50,15 +50,14 @@ export class S3Service {
     this.logger.log(`Deleted object: bucket=${this.bucketName} key=${key}`);
   }
 
-  createObjectKey(prefix: string, extension: string): string {
-    const normalizedPrefix = prefix.replace(/^\/+|\/+$/g, '');
+  createFileName(extension: string): string {
     const normalizedExtension = extension.replace(/^\./, '').toLowerCase();
 
-    if (!normalizedPrefix || !/^[a-z0-9]+$/i.test(normalizedExtension)) {
-      throw new Error('Invalid object key prefix or extension');
+    if (!/^[a-z0-9]+$/i.test(normalizedExtension)) {
+      throw new Error('Invalid file extension');
     }
 
-    return `${normalizedPrefix}/${randomUUID()}.${normalizedExtension}`;
+    return `${randomUUID()}.${normalizedExtension}`;
   }
 
   private ensureBucket(): Promise<void> {

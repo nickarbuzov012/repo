@@ -1,4 +1,7 @@
 import {
+  AvatarParamsSchema,
+  AvatarSchema,
+  AvatarUploadBodySchema,
   UpdateProfileRequestSchema,
   UserProfileSchema,
   UsersListQuerySchema,
@@ -38,5 +41,19 @@ export const usersZSlice = {
     summary: 'Soft delete current user profile',
     auth: true,
     res: { status: 204, schema: UserProfileSchema.optional() },
+  },
+  'POST /profile/my/avatars': {
+    tags,
+    summary: 'Upload an avatar for the current user',
+    auth: true,
+    multipartBody: AvatarUploadBodySchema,
+    res: { status: 201, schema: AvatarSchema },
+  },
+  'DELETE /profile/my/avatars/:avatarId': {
+    tags,
+    summary: 'Soft delete an avatar of the current user',
+    auth: true,
+    params: AvatarParamsSchema,
+    res: { status: 204, schema: AvatarSchema.optional() },
   },
 };

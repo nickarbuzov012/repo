@@ -38,11 +38,22 @@ function jsonBody(schema: z.ZodType) {
   };
 }
 
+function multipartBody(schema: z.ZodType) {
+  return {
+    required: true,
+    content: { 'multipart/form-data': { schema } },
+  };
+}
+
 function request(config: ZRouteConfig): RouteConfig['request'] {
   const result: RouteConfig['request'] = {};
 
   if (config.body) {
     result.body = jsonBody(config.body);
+  }
+
+  if (config.multipartBody) {
+    result.body = multipartBody(config.multipartBody);
   }
 
   if (config.query) {

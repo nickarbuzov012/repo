@@ -13,6 +13,7 @@ export type ZRouteConfig = {
   query?: any;
   cookies?: any;
   body?: any;
+  multipartBody?: any;
   res?: unknown | ZResponseConfig | ZResponseConfig[];
   tags?: string[];
   summary?: string;

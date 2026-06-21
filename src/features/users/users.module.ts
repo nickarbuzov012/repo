@@ -2,17 +2,31 @@ import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
+import { S3Module } from '../../providers/s3/s3.module';
+import { DeleteAvatarHandler } from './commands/delete-avatar.command-handler';
 import { DeleteMyProfileHandler } from './commands/delete-my-profile.command-handler';
+import { UploadAvatarHandler } from './commands/upload-avatar.command-handler';
 import { UpdateMyProfileHandler } from './commands/update-my-profile.command-handler';
 import { UserEntity } from './entities/user.entity';
+import { AvatarEntity } from './entities/avatar.entity';
 import { ListUsersHandler } from './queries/list-users.query-handler';
 import { UsersController } from './users.controller';
 
-const commandHandlers = [UpdateMyProfileHandler, DeleteMyProfileHandler];
+const commandHandlers = [
+  UpdateMyProfileHandler,
+  DeleteMyProfileHandler,
+  UploadAvatarHandler,
+  DeleteAvatarHandler,
+];
 const queryHandlers = [ListUsersHandler];
 
 @Module({
-  imports: [CqrsModule, TypeOrmModule.forFeature([UserEntity]), AuthModule],
+  imports: [
+    CqrsModule,
+    TypeOrmModule.forFeature([UserEntity, AvatarEntity]),
+    AuthModule,
+    S3Module,
+  ],
   controllers: [UsersController],
   providers: [...commandHandlers, ...queryHandlers],
 })

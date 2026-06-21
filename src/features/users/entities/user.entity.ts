@@ -5,7 +5,9 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { AvatarEntity } from './avatar.entity';
 
 export enum UserRole {
   User = 'user',
@@ -39,6 +41,9 @@ export class UserEntity {
     default: [UserRole.User],
   })
   roles: UserRole[];
+
+  @OneToMany(() => AvatarEntity, (avatar) => avatar.user)
+  avatars: AvatarEntity[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
