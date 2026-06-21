@@ -8,5 +8,10 @@ process.env.JWT_ACCESS_SECRET ??= 'test-access-secret';
 process.env.JWT_REFRESH_SECRET ??= 'test-refresh-secret';
 process.env.JWT_ACCESS_TTL ??= '5m';
 process.env.JWT_REFRESH_TTL ??= '7d';
+process.env.MINIO_ENDPOINT ??= 'http://localhost:9000';
+process.env.MINIO_ACCESS_KEY ??= 'minio';
+process.env.MINIO_SECRET_KEY ??= 'minio-secret';
+process.env.MINIO_BUCKET ??= 'avatars-test';
+process.env.MINIO_REGION ??= 'us-east-1';
 
 jest.setTimeout(30000);
