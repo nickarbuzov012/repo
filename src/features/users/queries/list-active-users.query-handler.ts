@@ -4,6 +4,7 @@ import type {
   ActiveUsersQuery as ActiveUsersQueryPayload,
   ActiveUsersResponse,
 } from '../contracts/users.contracts';
+import { CacheService } from '../../../providers/cache/cache.service';
 
 interface ActiveUserRow {
   id: string | null;
@@ -26,10 +27,25 @@ export class ListActiveUsersQuery {
 export class ListActiveUsersHandler
   implements IQueryHandler<ListActiveUsersQuery, ActiveUsersResponse>
 {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async execute(query: ListActiveUsersQuery): Promise<ActiveUsersResponse> {
     const { minAge, maxAge, page, limit } = query.payload;
+    const cacheKey = await this.cacheService.usersListKey('active', {
+      minAge,
+      maxAge,
+      page,
+      limit,
+    });
+    const cached = await this.cacheService.get<ActiveUsersResponse>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
     const offset = (page - 1) * limit;
     const rows = await this.dataSource.query<ActiveUserRow[]>(
       `
@@ -94,7 +110,7 @@ export class ListActiveUsersHandler
       } => row.id !== null,
     );
 
-    return {
+    const response: ActiveUsersResponse = {
       items: pageRows.map((row) => ({
         id: row.id,
         login: row.login,
@@ -113,5 +129,8 @@ export class ListActiveUsersHandler
       total,
       pages: Math.ceil(total / limit),
     };
+
+    await this.cacheService.set(cacheKey, response);
+    return response;
   }
 }

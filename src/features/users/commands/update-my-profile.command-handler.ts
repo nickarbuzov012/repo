@@ -9,6 +9,7 @@ import {
 import { UserEntity } from '../entities/user.entity';
 import { toUserProfile } from '../users.mapper';
 import { PasswordService } from '../../auth/services/password.service';
+import { CacheService } from '../../../providers/cache/cache.service';
 
 export class UpdateMyProfileCommand {
   constructor(
@@ -25,6 +26,7 @@ export class UpdateMyProfileHandler
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
     private readonly passwordService: PasswordService,
+    private readonly cacheService: CacheService,
   ) {}
 
   async execute(command: UpdateMyProfileCommand): Promise<UserProfile> {
@@ -71,6 +73,8 @@ export class UpdateMyProfileHandler
       user.passwordHash = await this.passwordService.hash(password);
     }
 
-    return toUserProfile(await this.usersRepository.save(user));
+    const profile = toUserProfile(await this.usersRepository.save(user));
+    await this.cacheService.invalidateUser(command.userId);
+    return profile;
   }
 }

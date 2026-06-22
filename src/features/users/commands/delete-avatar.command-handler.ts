@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { S3Service } from '../../../providers/s3/s3.service';
 import { AvatarEntity } from '../entities/avatar.entity';
+import { CacheService } from '../../../providers/cache/cache.service';
 
 export class DeleteAvatarCommand {
   constructor(
@@ -22,6 +23,7 @@ export class DeleteAvatarHandler
     @InjectRepository(AvatarEntity)
     private readonly avatarsRepository: Repository<AvatarEntity>,
     private readonly s3Service: S3Service,
+    private readonly cacheService: CacheService,
   ) {}
 
   async execute(command: DeleteAvatarCommand): Promise<void> {
@@ -34,6 +36,7 @@ export class DeleteAvatarHandler
     }
 
     await this.avatarsRepository.softDelete({ id: avatar.id });
+    await this.cacheService.invalidateUser(command.userId);
 
     try {
       await this.s3Service.deleteObject(avatar.fileName);

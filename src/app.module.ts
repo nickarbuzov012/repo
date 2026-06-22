@@ -5,6 +5,7 @@ import { UsersModule } from './features/users/users.module';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { ZodRouteValidationMiddleware } from './infrastructure/validation/zod-route.middleware';
+import { CacheModule } from './providers/cache/cache.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { ZodRouteValidationMiddleware } from './infrastructure/validation/zod-ro
       isGlobal: true,
     }),
     DatabaseModule,
+    CacheModule,
     HealthModule,
     AuthModule,
     UsersModule,

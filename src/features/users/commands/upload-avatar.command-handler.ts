@@ -11,6 +11,7 @@ import { AvatarEntity } from '../entities/avatar.entity';
 import { UserEntity } from '../entities/user.entity';
 import type { UploadedAvatarFile } from '../pipes/avatar-file-validation.pipe';
 import type { AvatarMimeType } from '../avatar.constants';
+import { CacheService } from '../../../providers/cache/cache.service';
 
 const MAX_ACTIVE_AVATARS = 5;
 
@@ -35,6 +36,7 @@ export class UploadAvatarHandler
   constructor(
     private readonly dataSource: DataSource,
     private readonly s3Service: S3Service,
+    private readonly cacheService: CacheService,
   ) {}
 
   async execute(command: UploadAvatarCommand): Promise<Avatar> {
@@ -80,6 +82,7 @@ export class UploadAvatarHandler
         `Uploaded avatar: userId=${command.userId} avatarId=${avatar.id}`,
       );
 
+      await this.cacheService.invalidateUser(command.userId);
       return this.toResponse(avatar);
     } catch (error: unknown) {
       await this.removeOrphanedObject(fileName);

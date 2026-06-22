@@ -6,6 +6,7 @@ import { RegisterRequest } from '../contracts/auth.contracts';
 import { PasswordService } from '../services/password.service';
 import { TokenPair, TokenService } from '../services/token.service';
 import { UserEntity, UserRole } from '../../users/entities/user.entity';
+import { CacheService } from '../../../providers/cache/cache.service';
 
 export class RegisterUserCommand {
   constructor(public readonly payload: RegisterRequest) {}
@@ -20,6 +21,7 @@ export class RegisterUserHandler
     private readonly usersRepository: Repository<UserEntity>,
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
+    private readonly cacheService: CacheService,
   ) {}
 
   async execute(command: RegisterUserCommand): Promise<TokenPair> {
@@ -41,6 +43,7 @@ export class RegisterUserHandler
     });
 
     await this.usersRepository.save(user);
+    await this.cacheService.incrementUsersListVersion();
 
     return this.tokenService.issueTokenPair(user.id, user.roles);
   }
