@@ -10,6 +10,7 @@ import { UpdateMyProfileHandler } from './commands/update-my-profile.command-han
 import { UserEntity } from './entities/user.entity';
 import { AvatarEntity } from './entities/avatar.entity';
 import { ListUsersHandler } from './queries/list-users.query-handler';
+import { ListActiveUsersHandler } from './queries/list-active-users.query-handler';
 import { UsersController } from './users.controller';
 
 const commandHandlers = [
@@ -18,7 +19,7 @@ const commandHandlers = [
   UploadAvatarHandler,
   DeleteAvatarHandler,
 ];
-const queryHandlers = [ListUsersHandler];
+const queryHandlers = [ListUsersHandler, ListActiveUsersHandler];
 
 @Module({
   imports: [

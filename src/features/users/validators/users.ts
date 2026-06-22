@@ -1,4 +1,6 @@
 import {
+  ActiveUsersQuerySchema,
+  ActiveUsersResponseSchema,
   AvatarParamsSchema,
   AvatarSchema,
   AvatarUploadBodySchema,
@@ -22,6 +24,13 @@ export const validators = {
 };
 
 export const usersZSlice = {
+  'GET /users/active': {
+    tags,
+    summary: 'Get active users by age range',
+    auth: true,
+    query: ActiveUsersQuerySchema,
+    res: { status: 200, schema: ActiveUsersResponseSchema },
+  },
   'GET /users': {
     tags,
     summary: 'Get users list',

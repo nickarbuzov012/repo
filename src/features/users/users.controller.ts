@@ -20,6 +20,10 @@ import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { AuthGuard } from '../auth/auth.guard';
 import { AuthRequestUser } from '../auth/auth-request-user';
 import {
+  ActiveUsersQuery,
+  ActiveUsersQuerySchema,
+  ActiveUsersResponse,
+  ActiveUsersResponseSchema,
   Avatar,
   AvatarParams,
   AvatarParamsSchema,
@@ -38,6 +42,7 @@ import { DeleteMyProfileCommand } from './commands/delete-my-profile.command-han
 import { UpdateMyProfileCommand } from './commands/update-my-profile.command-handler';
 import { UploadAvatarCommand } from './commands/upload-avatar.command-handler';
 import { ListUsersQuery } from './queries/list-users.query-handler';
+import { ListActiveUsersQuery } from './queries/list-active-users.query-handler';
 import {
   AvatarFileValidationPipe,
   MAX_AVATAR_SIZE_BYTES,
@@ -55,6 +60,17 @@ export class UsersController {
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
   ) {}
+
+  @Get('users/active')
+  @UseInterceptors(new ZodResponseInterceptor(ActiveUsersResponseSchema))
+  async listActiveUsers(
+    @Query(new ZodValidationPipe(ActiveUsersQuerySchema))
+    query: ActiveUsersQuery,
+  ): Promise<ActiveUsersResponse> {
+    return this.queryBus.execute<ListActiveUsersQuery, ActiveUsersResponse>(
+      new ListActiveUsersQuery(query),
+    );
+  }
 
   @Get('users')
   @UseInterceptors(new ZodResponseInterceptor(UsersListResponseSchema))

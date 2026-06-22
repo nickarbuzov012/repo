@@ -55,6 +55,45 @@ export const UsersListResponseSchema = z
   })
   .meta({ id: 'UsersListResponse' });
 
+export const ActiveUsersQuerySchema = z
+  .strictObject({
+    minAge: z.coerce.number().int().min(0).max(150).meta({ example: 18 }),
+    maxAge: z.coerce.number().int().min(0).max(150).meta({ example: 60 }),
+    page: z.coerce.number().int().min(1).default(1).meta({ example: 1 }),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .meta({ example: 20 }),
+  })
+  .refine(({ minAge, maxAge }) => minAge <= maxAge, {
+    message: 'minAge must be less than or equal to maxAge',
+    path: ['maxAge'],
+  })
+  .meta({ id: 'ActiveUsersQuery' });
+
+export const ActiveUserSchema = z
+  .object({
+    id: z.uuid(),
+    login: z.string(),
+    age: z.number().int(),
+    description: z.string(),
+    latestAvatar: AvatarSchema,
+  })
+  .meta({ id: 'ActiveUser' });
+
+export const ActiveUsersResponseSchema = z
+  .object({
+    items: z.array(ActiveUserSchema),
+    page: z.number().int(),
+    limit: z.number().int(),
+    total: z.number().int(),
+    pages: z.number().int(),
+  })
+  .meta({ id: 'ActiveUsersResponse' });
+
 export const UpdateProfileRequestSchema = z
   .strictObject({
     login: z.string().trim().min(1).max(64).optional().meta({ example: 'johnny' }),
@@ -86,4 +125,6 @@ export type Avatar = z.input<typeof AvatarSchema>;
 export type AvatarParams = z.infer<typeof AvatarParamsSchema>;
 export type UsersListQuery = z.infer<typeof UsersListQuerySchema>;
 export type UsersListResponse = z.input<typeof UsersListResponseSchema>;
+export type ActiveUsersQuery = z.infer<typeof ActiveUsersQuerySchema>;
+export type ActiveUsersResponse = z.input<typeof ActiveUsersResponseSchema>;
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;

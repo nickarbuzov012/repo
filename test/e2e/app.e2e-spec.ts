@@ -1,5 +1,6 @@
 import { createHmac } from 'crypto';
 import { UserEntity } from '../../src/features/users/entities/user.entity';
+import { AvatarEntity } from '../../src/features/users/entities/avatar.entity';
 import { E2eTestApp, createE2eTestApp, requestJson } from './test-app';
 
 interface AuthResponseBody {
@@ -31,6 +32,20 @@ interface AvatarResponseBody {
   mimeType: 'image/jpeg' | 'image/png';
   size: number;
   createdAt: string;
+}
+
+interface ActiveUsersResponseBody {
+  items: Array<{
+    id: string;
+    login: string;
+    age: number;
+    description: string;
+    latestAvatar: AvatarResponseBody;
+  }>;
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
 }
 
 const registerPayload = {
@@ -635,5 +650,137 @@ describe('application endpoints (e2e)', () => {
       },
     );
     expect(repeatedDelete.status).toBe(404);
+  });
+
+  it('lists active users with all filters, latest avatar and stable pagination', async () => {
+    const usersRepository = testApp.dataSource.getRepository(UserEntity);
+    const avatarsRepository = testApp.dataSource.getRepository(AvatarEntity);
+    const passwordHash = 'not-used-by-this-test';
+
+    const users = await usersRepository.save([
+      usersRepository.create({
+        login: 'active-in-range-a',
+        email: 'active-a@example.com',
+        passwordHash,
+        age: 30,
+        description: 'Active A',
+      }),
+      usersRepository.create({
+        login: 'active-in-range-b',
+        email: 'active-b@example.com',
+        passwordHash,
+        age: 40,
+        description: 'Active B',
+      }),
+      usersRepository.create({
+        login: 'active-outside-age',
+        email: 'active-outside@example.com',
+        passwordHash,
+        age: 17,
+        description: 'Too young',
+      }),
+      usersRepository.create({
+        login: 'active-empty-description',
+        email: 'active-empty@example.com',
+        passwordHash,
+        age: 35,
+        description: '',
+      }),
+    ]);
+    const [activeA, activeB, outsideAge, emptyDescription] = users;
+    const baseDate = new Date('2026-01-01T00:00:00.000Z');
+
+    for (const user of users) {
+      await avatarsRepository.save(
+        [0, 1, 2].map((index) =>
+          avatarsRepository.create({
+            userId: user.id,
+            fileName: `active-query/${user.id}/${index}.png`,
+            mimeType: 'image/png',
+            size: 100 + index,
+            createdAt: new Date(baseDate.getTime() + index * 1000),
+          }),
+        ),
+      );
+    }
+    await avatarsRepository.save(
+      avatarsRepository.create({
+        userId: activeA.id,
+        fileName: `active-query/${activeA.id}/deleted.png`,
+        mimeType: 'image/png',
+        size: 999,
+        createdAt: new Date(baseDate.getTime() + 10_000),
+        deletedAt: new Date(baseDate.getTime() + 11_000),
+      }),
+    );
+
+    const login = await requestJson<AuthResponseBody>(
+      testApp.baseUrl,
+      'POST',
+      '/api/auth/login',
+      {
+        body: {
+          login: registerPayload.login,
+          password: registerPayload.password,
+        },
+      },
+    );
+    expect(login.status).toBe(201);
+    const accessToken = login.body.access_token;
+    const firstPage = await requestJson<ActiveUsersResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/users/active?minAge=29&maxAge=45&page=1&limit=1',
+      { headers: { authorization: `Bearer ${accessToken}` } },
+    );
+
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body).toMatchObject({
+      page: 1,
+      limit: 1,
+      total: 2,
+      pages: 2,
+    });
+    expect(firstPage.body.items).toHaveLength(1);
+
+    const secondPage = await requestJson<ActiveUsersResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/users/active?minAge=29&maxAge=45&page=2&limit=1',
+      { headers: { authorization: `Bearer ${accessToken}` } },
+    );
+    const repeatedFirstPage = await requestJson<ActiveUsersResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/users/active?minAge=29&maxAge=45&page=1&limit=1',
+      { headers: { authorization: `Bearer ${accessToken}` } },
+    );
+
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.body.items).toHaveLength(1);
+    expect(repeatedFirstPage.body.items[0].id).toBe(firstPage.body.items[0].id);
+    expect(
+      new Set(
+        [...firstPage.body.items, ...secondPage.body.items].map(({ id }) => id),
+      ),
+    ).toEqual(new Set([activeA.id, activeB.id]));
+    const activeAResult = [
+      ...firstPage.body.items,
+      ...secondPage.body.items,
+    ].find(({ id }) => id === activeA.id);
+    expect(activeAResult?.latestAvatar.fileName).toBe(
+      `active-query/${activeA.id}/2.png`,
+    );
+    expect([outsideAge.id, emptyDescription.id]).not.toContain(
+      firstPage.body.items[0].id,
+    );
+
+    const invalidRange = await requestJson(
+      testApp.baseUrl,
+      'GET',
+      '/api/users/active?minAge=45&maxAge=29',
+      { headers: { authorization: `Bearer ${accessToken}` } },
+    );
+    expect(invalidRange.status).toBe(400);
   });
 });
