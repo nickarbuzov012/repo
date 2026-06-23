@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { Logger, UnauthorizedException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,6 +15,8 @@ export class LoginUserCommand {
 export class LoginUserHandler
   implements ICommandHandler<LoginUserCommand, TokenPair>
 {
+  private readonly logger = new Logger(LoginUserHandler.name);
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
@@ -40,6 +42,8 @@ export class LoginUserHandler
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid login or password');
     }
+
+    this.logger.log(`Logged in user: userId=${user.id}`);
 
     return this.tokenService.issueTokenPair(user.id, user.roles);
   }

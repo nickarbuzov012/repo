@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, Logger } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -16,6 +16,8 @@ export class RegisterUserCommand {
 export class RegisterUserHandler
   implements ICommandHandler<RegisterUserCommand, TokenPair>
 {
+  private readonly logger = new Logger(RegisterUserHandler.name);
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
@@ -44,6 +46,8 @@ export class RegisterUserHandler
 
     await this.usersRepository.save(user);
     await this.cacheService.incrementUsersListVersion();
+
+    this.logger.log(`Registered user: userId=${user.id}`);
 
     return this.tokenService.issueTokenPair(user.id, user.roles);
   }

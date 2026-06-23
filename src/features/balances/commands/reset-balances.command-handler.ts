@@ -1,4 +1,5 @@
 import { InjectQueue } from '@nestjs/bullmq';
+import { Logger } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import type { Queue } from 'bullmq';
 import {
@@ -13,6 +14,8 @@ export class ResetBalancesCommand {}
 export class ResetBalancesHandler
   implements ICommandHandler<ResetBalancesCommand, BalanceResetResponse>
 {
+  private readonly logger = new Logger(ResetBalancesHandler.name);
+
   constructor(
     @InjectQueue(BALANCE_RESET_QUEUE)
     private readonly balanceResetQueue: Queue,
@@ -32,6 +35,8 @@ export class ResetBalancesHandler
         removeOnFail: 1000,
       },
     );
+
+    this.logger.log(`Enqueued balance reset: jobId=${job.id}`);
 
     return { jobId: String(job.id) };
   }

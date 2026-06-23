@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, Not, Repository } from 'typeorm';
@@ -22,6 +22,8 @@ export class UpdateMyProfileCommand {
 export class UpdateMyProfileHandler
   implements ICommandHandler<UpdateMyProfileCommand, UserProfile>
 {
+  private readonly logger = new Logger(UpdateMyProfileHandler.name);
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
@@ -75,6 +77,7 @@ export class UpdateMyProfileHandler
 
     const profile = toUserProfile(await this.usersRepository.save(user));
     await this.cacheService.invalidateUser(command.userId);
+    this.logger.log(`Updated profile: userId=${command.userId}`);
     return profile;
   }
 }

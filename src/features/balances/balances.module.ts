@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { AuthModule } from '../auth/auth.module';
 import { BALANCE_RESET_QUEUE } from './balance-reset.constants';
+import { BalanceResetScheduler } from './balance-reset.scheduler';
 import { BalancesController } from './balances.controller';
 import { ResetBalancesHandler } from './commands/reset-balances.command-handler';
 import { BalanceResetProcessor } from './processors/balance-reset.processor';
@@ -16,6 +17,10 @@ import { BalanceResetProcessor } from './processors/balance-reset.processor';
     }),
   ],
   controllers: [BalancesController],
-  providers: [ResetBalancesHandler, BalanceResetProcessor],
+  providers: [
+    ResetBalancesHandler,
+    BalanceResetProcessor,
+    BalanceResetScheduler,
+  ],
 })
 export class BalancesModule {}

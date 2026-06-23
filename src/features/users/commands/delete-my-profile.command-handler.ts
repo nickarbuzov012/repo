@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { Logger, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,6 +13,8 @@ export class DeleteMyProfileCommand {
 export class DeleteMyProfileHandler
   implements ICommandHandler<DeleteMyProfileCommand, void>
 {
+  private readonly logger = new Logger(DeleteMyProfileHandler.name);
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
@@ -27,5 +29,6 @@ export class DeleteMyProfileHandler
     }
 
     await this.cacheService.invalidateUser(command.userId);
+    this.logger.log(`Deleted profile: userId=${command.userId}`);
   }
 }
