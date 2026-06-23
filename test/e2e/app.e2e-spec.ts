@@ -377,6 +377,189 @@ describe('application endpoints (e2e)', () => {
     );
   });
 
+  it('transfers balance transactionally between active users', async () => {
+    const usersRepository = testApp.dataSource.getRepository(UserEntity);
+    const cacheService = testApp.app.get(CacheService);
+    const sender = await registerUser(testApp.baseUrl, {
+      login: 'transfer-sender',
+      email: 'transfer-sender@example.com',
+      password: 'password123',
+      age: 30,
+      description: 'Transfer sender',
+    });
+    const recipient = await registerUser(testApp.baseUrl, {
+      login: 'transfer-recipient',
+      email: 'transfer-recipient@example.com',
+      password: 'password123',
+      age: 31,
+      description: 'Transfer recipient',
+    });
+    const secondRecipient = await registerUser(testApp.baseUrl, {
+      login: 'transfer-recipient-2',
+      email: 'transfer-recipient-2@example.com',
+      password: 'password123',
+      age: 32,
+      description: 'Transfer recipient 2',
+    });
+
+    const senderMe = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+      },
+    );
+    const recipientMe = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${recipient.access_token}` },
+      },
+    );
+    const secondRecipientMe = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${secondRecipient.access_token}` },
+      },
+    );
+
+    await usersRepository.update({ id: senderMe.body.id }, { balance: 1000 });
+    await usersRepository.update({ id: recipientMe.body.id }, { balance: 100 });
+    await Promise.all([
+      cacheService.invalidateUser(senderMe.body.id),
+      cacheService.invalidateUser(recipientMe.body.id),
+    ]);
+
+    const transfer = await requestJson(
+      testApp.baseUrl,
+      'POST',
+      '/api/users/transfer',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: recipientMe.body.id,
+          amountCents: 250,
+        },
+      },
+    );
+
+    expect(transfer.status).toBe(204);
+
+    const senderAfterTransfer = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+      },
+    );
+    const recipientAfterTransfer = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${recipient.access_token}` },
+      },
+    );
+
+    expect(senderAfterTransfer.body.balance).toBe(750);
+    expect(recipientAfterTransfer.body.balance).toBe(350);
+
+    const insufficientFunds = await requestJson(
+      testApp.baseUrl,
+      'POST',
+      '/api/users/transfer',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: recipientMe.body.id,
+          amountCents: 1000,
+        },
+      },
+    );
+
+    expect(insufficientFunds.status).toBe(409);
+    await expect(
+      usersRepository.findOneByOrFail({ id: senderMe.body.id }),
+    ).resolves.toMatchObject({ balance: 750 });
+    await expect(
+      usersRepository.findOneByOrFail({ id: recipientMe.body.id }),
+    ).resolves.toMatchObject({ balance: 350 });
+
+    const selfTransfer = await requestJson(
+      testApp.baseUrl,
+      'POST',
+      '/api/users/transfer',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: senderMe.body.id,
+          amountCents: 1,
+        },
+      },
+    );
+
+    expect(selfTransfer.status).toBe(400);
+
+    const missingRecipient = await requestJson(
+      testApp.baseUrl,
+      'POST',
+      '/api/users/transfer',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: '1305f2ff-93c7-45aa-bc66-4f74b4ee2596',
+          amountCents: 1,
+        },
+      },
+    );
+
+    expect(missingRecipient.status).toBe(404);
+
+    const invalidAmount = await requestJson(
+      testApp.baseUrl,
+      'POST',
+      '/api/users/transfer',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: recipientMe.body.id,
+          amountCents: 0,
+        },
+      },
+    );
+
+    expect(invalidAmount.status).toBe(400);
+
+    const concurrentTransfers = await Promise.all([
+      requestJson(testApp.baseUrl, 'POST', '/api/users/transfer', {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: recipientMe.body.id,
+          amountCents: 600,
+        },
+      }),
+      requestJson(testApp.baseUrl, 'POST', '/api/users/transfer', {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: secondRecipientMe.body.id,
+          amountCents: 600,
+        },
+      }),
+    ]);
+
+    expect(concurrentTransfers.map(({ status }) => status).sort()).toEqual([
+      204, 409,
+    ]);
+    await expect(
+      usersRepository.findOneByOrFail({ id: senderMe.body.id }),
+    ).resolves.toMatchObject({ balance: 150 });
+  });
+
   it('rejects duplicate registration', async () => {
     const response = await requestJson(
       testApp.baseUrl,

@@ -4,6 +4,7 @@ import {
   AvatarParamsSchema,
   AvatarSchema,
   AvatarUploadBodySchema,
+  TransferBalanceRequestSchema,
   UpdateProfileRequestSchema,
   UserProfileSchema,
   UsersListQuerySchema,
@@ -21,6 +22,9 @@ export const validators = {
     body: UpdateProfileRequestSchema,
     res: UserProfileSchema,
   },
+  transferBalance: {
+    body: TransferBalanceRequestSchema,
+  },
 };
 
 export const usersZSlice = {
@@ -37,6 +41,13 @@ export const usersZSlice = {
     auth: true,
     query: validators.list.query,
     res: { status: 200, schema: validators.list.res },
+  },
+  'POST /users/transfer': {
+    tags,
+    summary: 'Transfer balance to another user',
+    auth: true,
+    body: validators.transferBalance.body,
+    res: { status: 204, schema: UserProfileSchema.optional() },
   },
   'PATCH /profile/my': {
     tags,

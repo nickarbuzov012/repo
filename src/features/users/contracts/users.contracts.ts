@@ -1,4 +1,5 @@
 import { z } from '../../../infrastructure/documentation/zod';
+import { MinorUnitSchema } from '../../../common/validation/minor-unit.schema';
 import { UserRole } from '../entities/user.entity';
 import { AVATAR_MIME_TYPES } from '../avatar.constants';
 
@@ -120,6 +121,18 @@ export const UpdateProfileRequestSchema = z
   })
   .meta({ id: 'UpdateProfileRequest' });
 
+export const TransferBalanceRequestSchema = z
+  .strictObject({
+    recipientId: z.uuid().meta({
+      example: '1305f2ff-93c7-45aa-bc66-4f74b4ee2596',
+    }),
+    amountCents: MinorUnitSchema.positive().meta({
+      description: 'Transfer amount in cents',
+      example: 500,
+    }),
+  })
+  .meta({ id: 'TransferBalanceRequest' });
+
 export type UserProfile = z.input<typeof UserProfileSchema>;
 export type Avatar = z.input<typeof AvatarSchema>;
 export type AvatarParams = z.infer<typeof AvatarParamsSchema>;
@@ -128,3 +141,6 @@ export type UsersListResponse = z.input<typeof UsersListResponseSchema>;
 export type ActiveUsersQuery = z.infer<typeof ActiveUsersQuerySchema>;
 export type ActiveUsersResponse = z.input<typeof ActiveUsersResponseSchema>;
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;
+export type TransferBalanceRequest = z.infer<
+  typeof TransferBalanceRequestSchema
+>;

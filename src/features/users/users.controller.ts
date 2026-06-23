@@ -28,6 +28,8 @@ import {
   AvatarParams,
   AvatarParamsSchema,
   AvatarSchema,
+  TransferBalanceRequest,
+  TransferBalanceRequestSchema,
   UpdateProfileRequest,
   UpdateProfileRequestSchema,
   UserProfile,
@@ -39,6 +41,7 @@ import {
 } from './contracts/users.contracts';
 import { DeleteAvatarCommand } from './commands/delete-avatar.command-handler';
 import { DeleteMyProfileCommand } from './commands/delete-my-profile.command-handler';
+import { TransferBalanceCommand } from './commands/transfer-balance.command-handler';
 import { UpdateMyProfileCommand } from './commands/update-my-profile.command-handler';
 import { UploadAvatarCommand } from './commands/upload-avatar.command-handler';
 import { ListUsersQuery } from './queries/list-users.query-handler';
@@ -79,6 +82,22 @@ export class UsersController {
   ): Promise<UsersListResponse> {
     return this.queryBus.execute<ListUsersQuery, UsersListResponse>(
       new ListUsersQuery(query),
+    );
+  }
+
+  @Post('users/transfer')
+  @HttpCode(204)
+  async transferBalance(
+    @Req() request: AuthenticatedHttpRequest,
+    @Body(new ZodValidationPipe(TransferBalanceRequestSchema))
+    body: TransferBalanceRequest,
+  ): Promise<void> {
+    await this.commandBus.execute<TransferBalanceCommand, void>(
+      new TransferBalanceCommand(
+        request.user.id,
+        body.recipientId,
+        body.amountCents,
+      ),
     );
   }
 

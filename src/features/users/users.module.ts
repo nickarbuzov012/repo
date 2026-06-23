@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module';
 import { S3Module } from '../../providers/s3/s3.module';
 import { DeleteAvatarHandler } from './commands/delete-avatar.command-handler';
 import { DeleteMyProfileHandler } from './commands/delete-my-profile.command-handler';
+import { TransferBalanceHandler } from './commands/transfer-balance.command-handler';
 import { UploadAvatarHandler } from './commands/upload-avatar.command-handler';
 import { UpdateMyProfileHandler } from './commands/update-my-profile.command-handler';
 import { UserEntity } from './entities/user.entity';
@@ -18,6 +19,7 @@ const commandHandlers = [
   DeleteMyProfileHandler,
   UploadAvatarHandler,
   DeleteAvatarHandler,
+  TransferBalanceHandler,
 ];
 const queryHandlers = [ListUsersHandler, ListActiveUsersHandler];
 
