@@ -34,6 +34,9 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 1000 })
   description: string;
 
+  @Column({ type: 'integer', default: 0 })
+  balance: number;
+
   @Column({
     type: 'enum',
     enum: UserRole,

@@ -1,5 +1,6 @@
 import { z } from '../../../infrastructure/documentation/zod';
 import { UserRole } from '../../users/entities/user.entity';
+import { MinorUnitSchema } from '../../../common/validation/minor-unit.schema';
 
 export const RegisterRequestSchema = z
   .strictObject({
@@ -61,6 +62,7 @@ export const MeResponseSchema = z
     email: z.email().meta({ example: 'john@example.com' }),
     age: z.number().int().meta({ example: 25 }),
     description: z.string().meta({ example: 'About John' }),
+    balance: MinorUnitSchema,
     roles: z.array(z.enum(UserRole)).meta({ example: [UserRole.User] }),
     createdAt: z.date().transform((date) => date.toISOString()),
     updatedAt: z.date().transform((date) => date.toISOString()),

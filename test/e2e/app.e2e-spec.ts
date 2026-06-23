@@ -1,13 +1,18 @@
 import { createHmac } from 'crypto';
 import { UserEntity } from '../../src/features/users/entities/user.entity';
 import { AvatarEntity } from '../../src/features/users/entities/avatar.entity';
+import {
+  MinorUnitSchema,
+  POSTGRES_INTEGER_MAX,
+} from '../../src/common/validation/minor-unit.schema';
+import { CacheService } from '../../src/providers/cache/cache.service';
 import { E2eTestApp, createE2eTestApp, requestJson } from './test-app';
 
 interface AuthResponseBody {
   access_token: string;
 }
 
-interface MeResponseBody {
+interface UserProfileResponseBody {
   id: string;
   login: string;
   email: string;
@@ -18,8 +23,12 @@ interface MeResponseBody {
   updatedAt: string;
 }
 
+interface MeResponseBody extends UserProfileResponseBody {
+  balance: number;
+}
+
 interface UsersListResponseBody {
-  items: MeResponseBody[];
+  items: UserProfileResponseBody[];
   page: number;
   limit: number;
   total: number;
@@ -190,10 +199,30 @@ describe('application endpoints (e2e)', () => {
       email: 'john@example.com',
       age: registerPayload.age,
       description: registerPayload.description,
+      balance: 0,
       roles: ['user'],
       createdAt: expect.any(String),
       updatedAt: expect.any(String),
     });
+
+    await testApp.dataSource
+      .getRepository(UserEntity)
+      .update({ id: me.body.id }, { balance: 2051 });
+    await testApp.app.get(CacheService).invalidateUser(me.body.id);
+
+    const meWithBalance = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: {
+          authorization: `Bearer ${registration.body.access_token}`,
+        },
+      },
+    );
+
+    expect(meWithBalance.status).toBe(200);
+    expect(meWithBalance.body.balance).toBe(2051);
 
     const expiredAccess = await requestJson(
       testApp.baseUrl,
@@ -339,6 +368,15 @@ describe('application endpoints (e2e)', () => {
     });
   });
 
+  it('validates monetary values as PostgreSQL integer minor units', () => {
+    expect(MinorUnitSchema.safeParse(2051).success).toBe(true);
+    expect(MinorUnitSchema.safeParse(1.5).success).toBe(false);
+    expect(MinorUnitSchema.safeParse(-1).success).toBe(false);
+    expect(MinorUnitSchema.safeParse(POSTGRES_INTEGER_MAX + 1).success).toBe(
+      false,
+    );
+  });
+
   it('rejects duplicate registration', async () => {
     const response = await requestJson(
       testApp.baseUrl,
@@ -444,7 +482,7 @@ describe('application endpoints (e2e)', () => {
       description: 'Original profile',
     });
 
-    const updated = await requestJson<MeResponseBody>(
+    const updated = await requestJson<UserProfileResponseBody>(
       testApp.baseUrl,
       'PATCH',
       '/api/profile/my',
