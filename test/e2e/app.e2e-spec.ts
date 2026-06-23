@@ -57,6 +57,10 @@ interface ActiveUsersResponseBody {
   pages: number;
 }
 
+interface BalanceResetResponseBody {
+  jobId: string;
+}
+
 const registerPayload = {
   login: 'john',
   email: 'John@example.com',
@@ -137,6 +141,27 @@ function createExpiredAccessToken(userId: string): string {
     .digest('base64url');
 
   return `${header}.${payload}.${signature}`;
+}
+
+async function waitForUserBalance(
+  testApp: E2eTestApp,
+  userId: string,
+  expectedBalance: number,
+): Promise<void> {
+  const usersRepository = testApp.dataSource.getRepository(UserEntity);
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const user = await usersRepository.findOneByOrFail({ id: userId });
+
+    if (user.balance === expectedBalance) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  const user = await usersRepository.findOneByOrFail({ id: userId });
+  expect(user.balance).toBe(expectedBalance);
 }
 
 describe('application endpoints (e2e)', () => {
@@ -558,6 +583,64 @@ describe('application endpoints (e2e)', () => {
     await expect(
       usersRepository.findOneByOrFail({ id: senderMe.body.id }),
     ).resolves.toMatchObject({ balance: 150 });
+  });
+
+  it('enqueues and processes asynchronous balance reset', async () => {
+    const usersRepository = testApp.dataSource.getRepository(UserEntity);
+    const auth = await registerUser(testApp.baseUrl, {
+      login: 'balance-reset-user',
+      email: 'balance-reset-user@example.com',
+      password: 'password123',
+      age: 33,
+      description: 'Balance reset user',
+    });
+    const me = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${auth.access_token}` },
+      },
+    );
+
+    await usersRepository.update({ id: me.body.id }, { balance: 777 });
+    await testApp.app.get(CacheService).invalidateUser(me.body.id);
+
+    const meBeforeReset = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${auth.access_token}` },
+      },
+    );
+
+    expect(meBeforeReset.body.balance).toBe(777);
+
+    const reset = await requestJson<BalanceResetResponseBody>(
+      testApp.baseUrl,
+      'POST',
+      '/api/balances/reset',
+      {
+        headers: { authorization: `Bearer ${auth.access_token}` },
+      },
+    );
+
+    expect(reset.status).toBe(202);
+    expect(reset.body).toEqual({ jobId: expect.any(String) });
+
+    await waitForUserBalance(testApp, me.body.id, 0);
+
+    const meAfterReset = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${auth.access_token}` },
+      },
+    );
+
+    expect(meAfterReset.body.balance).toBe(0);
   });
 
   it('rejects duplicate registration', async () => {

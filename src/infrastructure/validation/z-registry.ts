@@ -1,4 +1,5 @@
 import { authZSlice } from '../../features/auth/validators/auth';
+import { balancesZSlice } from '../../features/balances/validators/balances';
 import { usersZSlice } from '../../features/users/validators/users';
 import { healthZSlice } from '../../health/validators/health';
 
@@ -25,5 +26,6 @@ export type ZRouteConfig = {
 export const zRegistry: Record<string, ZRouteConfig> = {
   ...healthZSlice,
   ...authZSlice,
+  ...balancesZSlice,
   ...usersZSlice,
 };

@@ -68,8 +68,14 @@ export class CacheService {
   }
 
   async invalidateUser(userId: string): Promise<void> {
+    await this.invalidateUsers([userId]);
+  }
+
+  async invalidateUsers(userIds: string[]): Promise<void> {
+    const uniqueUserIds = [...new Set(userIds)];
+
     await Promise.all([
-      this.delete(this.userProfileKey(userId)),
+      ...uniqueUserIds.map((userId) => this.delete(this.userProfileKey(userId))),
       this.incrementUsersListVersion(),
     ]);
   }
