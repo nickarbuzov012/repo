@@ -14,9 +14,10 @@ export class DeleteAvatarCommand {
 }
 
 @CommandHandler(DeleteAvatarCommand)
-export class DeleteAvatarHandler
-  implements ICommandHandler<DeleteAvatarCommand, void>
-{
+export class DeleteAvatarHandler implements ICommandHandler<
+  DeleteAvatarCommand,
+  void
+> {
   private readonly logger = new Logger(DeleteAvatarHandler.name);
 
   constructor(
@@ -29,6 +30,7 @@ export class DeleteAvatarHandler
   async execute(command: DeleteAvatarCommand): Promise<void> {
     const avatar = await this.avatarsRepository.findOne({
       where: { id: command.avatarId, userId: command.userId },
+      relations: { file: true },
     });
 
     if (!avatar) {
@@ -39,7 +41,7 @@ export class DeleteAvatarHandler
     await this.cacheService.invalidateUser(command.userId);
 
     try {
-      await this.s3Service.deleteObject(avatar.fileName);
+      await this.s3Service.deleteObject(avatar.file.storageKey);
     } catch (error: unknown) {
       this.logger.error(
         `Avatar was soft-deleted but object cleanup failed: avatarId=${avatar.id}`,

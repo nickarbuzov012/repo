@@ -8,8 +8,8 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+import { FileEntity } from '../../../providers/files/entities/file.entity';
 import { UserEntity } from './user.entity';
-import type { AvatarMimeType } from '../avatar.constants';
 
 @Entity('avatars')
 @Index('IDX_avatars_user_active_created', ['userId', 'createdAt'], {
@@ -22,18 +22,16 @@ export class AvatarEntity {
   @Column({ name: 'user_id', type: 'uuid' })
   userId: string;
 
-  @Column({ name: 'file_name', type: 'varchar', length: 255, unique: true })
-  fileName: string;
-
-  @Column({ name: 'mime_type', type: 'varchar', length: 32 })
-  mimeType: AvatarMimeType;
-
-  @Column({ type: 'integer' })
-  size: number;
+  @Column({ name: 'file_id', type: 'uuid' })
+  fileId: string;
 
   @ManyToOne(() => UserEntity, (user) => user.avatars, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: UserEntity;
+
+  @ManyToOne(() => FileEntity, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'file_id' })
+  file: FileEntity;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

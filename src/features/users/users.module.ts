@@ -3,6 +3,7 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { S3Module } from '../../providers/s3/s3.module';
+import { FileEntity } from '../../providers/files/entities/file.entity';
 import { DeleteAvatarHandler } from './commands/delete-avatar.command-handler';
 import { DeleteMyProfileHandler } from './commands/delete-my-profile.command-handler';
 import { TransferBalanceHandler } from './commands/transfer-balance.command-handler';
@@ -26,7 +27,7 @@ const queryHandlers = [ListUsersHandler, ListActiveUsersHandler];
 @Module({
   imports: [
     CqrsModule,
-    TypeOrmModule.forFeature([UserEntity, AvatarEntity]),
+    TypeOrmModule.forFeature([UserEntity, AvatarEntity, FileEntity]),
     AuthModule,
     S3Module,
   ],

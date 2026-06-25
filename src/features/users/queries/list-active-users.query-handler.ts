@@ -14,6 +14,7 @@ interface ActiveUserRow {
   avatar_id: string | null;
   avatar_file_name: string | null;
   avatar_mime_type: 'image/jpeg' | 'image/png' | null;
+  avatar_file_hash: string | null;
   avatar_size: number | null;
   avatar_created_at: Date | null;
   total: string;
@@ -24,9 +25,10 @@ export class ListActiveUsersQuery {
 }
 
 @QueryHandler(ListActiveUsersQuery)
-export class ListActiveUsersHandler
-  implements IQueryHandler<ListActiveUsersQuery, ActiveUsersResponse>
-{
+export class ListActiveUsersHandler implements IQueryHandler<
+  ListActiveUsersQuery,
+  ActiveUsersResponse
+> {
   constructor(
     private readonly dataSource: DataSource,
     private readonly cacheService: CacheService,
@@ -57,14 +59,22 @@ export class ListActiveUsersHandler
             u.description,
             u.created_at AS user_created_at,
             latest_avatar.id AS avatar_id,
-            latest_avatar.file_name AS avatar_file_name,
+            latest_avatar.storage_key AS avatar_file_name,
             latest_avatar.mime_type AS avatar_mime_type,
+            latest_avatar.hash AS avatar_file_hash,
             latest_avatar.size AS avatar_size,
             latest_avatar.created_at AS avatar_created_at
           FROM users u
           JOIN LATERAL (
-            SELECT a.id, a.file_name, a.mime_type, a.size, a.created_at
+            SELECT
+              a.id,
+              f.storage_key,
+              f.mime_type,
+              f.hash,
+              f.size,
+              a.created_at
             FROM avatars a
+            INNER JOIN files f ON f.id = a.file_id
             WHERE a.user_id = u.id AND a.deleted_at IS NULL
             ORDER BY a.created_at DESC, a.id DESC
             LIMIT 1
@@ -97,7 +107,9 @@ export class ListActiveUsersHandler
     );
     const total = Number(rows[0]?.total ?? 0);
     const pageRows = rows.filter(
-      (row): row is ActiveUserRow & {
+      (
+        row,
+      ): row is ActiveUserRow & {
         id: string;
         login: string;
         age: number;
@@ -105,6 +117,7 @@ export class ListActiveUsersHandler
         avatar_id: string;
         avatar_file_name: string;
         avatar_mime_type: 'image/jpeg' | 'image/png';
+        avatar_file_hash: string;
         avatar_size: number;
         avatar_created_at: Date;
       } => row.id !== null,
@@ -120,6 +133,7 @@ export class ListActiveUsersHandler
           id: row.avatar_id,
           fileName: row.avatar_file_name,
           mimeType: row.avatar_mime_type,
+          fileHash: row.avatar_file_hash,
           size: row.avatar_size,
           createdAt: row.avatar_created_at,
         },

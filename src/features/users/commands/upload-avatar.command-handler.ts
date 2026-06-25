@@ -1,10 +1,8 @@
-import {
-  ConflictException,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { createHash } from 'crypto';
 import { DataSource, IsNull } from 'typeorm';
+import { FileEntity } from '../../../providers/files/entities/file.entity';
 import { S3Service } from '../../../providers/s3/s3.service';
 import type { Avatar } from '../contracts/users.contracts';
 import { AvatarEntity } from '../entities/avatar.entity';
@@ -28,9 +26,10 @@ export class UploadAvatarCommand {
 }
 
 @CommandHandler(UploadAvatarCommand)
-export class UploadAvatarHandler
-  implements ICommandHandler<UploadAvatarCommand, Avatar>
-{
+export class UploadAvatarHandler implements ICommandHandler<
+  UploadAvatarCommand,
+  Avatar
+> {
   private readonly logger = new Logger(UploadAvatarHandler.name);
 
   constructor(
@@ -41,10 +40,14 @@ export class UploadAvatarHandler
 
   async execute(command: UploadAvatarCommand): Promise<Avatar> {
     const extension = extensionsByMimeType[command.file.mimetype];
-    const fileName = this.s3Service.createFileName(extension);
+    const storageKey = this.s3Service.createFileName(extension);
+    const hashAlgorithm = 'sha256';
+    const fileHash = createHash(hashAlgorithm)
+      .update(command.file.buffer)
+      .digest('hex');
 
     await this.s3Service.uploadObject({
-      key: fileName,
+      key: storageKey,
       body: command.file.buffer,
       contentType: command.file.mimetype,
     });
@@ -65,17 +68,29 @@ export class UploadAvatarHandler
         });
 
         if (activeAvatarCount >= MAX_ACTIVE_AVATARS) {
-          throw new ConflictException('A user can have at most five active avatars');
+          throw new ConflictException(
+            'A user can have at most five active avatars',
+          );
         }
 
-        return manager.save(
-          manager.create(AvatarEntity, {
-            userId: command.userId,
-            fileName,
+        const file = await manager.save(
+          manager.create(FileEntity, {
+            storageKey,
             mimeType: command.file.mimetype,
             size: command.file.size,
+            hash: fileHash,
+            hashAlgorithm,
           }),
         );
+        const avatar = await manager.save(
+          manager.create(AvatarEntity, {
+            userId: command.userId,
+            fileId: file.id,
+          }),
+        );
+
+        avatar.file = file;
+        return avatar;
       });
 
       this.logger.log(
@@ -85,17 +100,17 @@ export class UploadAvatarHandler
       await this.cacheService.invalidateUser(command.userId);
       return this.toResponse(avatar);
     } catch (error: unknown) {
-      await this.removeOrphanedObject(fileName);
+      await this.removeOrphanedObject(storageKey);
       throw error;
     }
   }
 
-  private async removeOrphanedObject(fileName: string): Promise<void> {
+  private async removeOrphanedObject(storageKey: string): Promise<void> {
     try {
-      await this.s3Service.deleteObject(fileName);
+      await this.s3Service.deleteObject(storageKey);
     } catch (error: unknown) {
       this.logger.error(
-        `Failed to remove orphaned avatar object: fileName=${fileName}`,
+        `Failed to remove orphaned avatar object: storageKey=${storageKey}`,
         error instanceof Error ? error.stack : undefined,
       );
     }
@@ -104,9 +119,10 @@ export class UploadAvatarHandler
   private toResponse(avatar: AvatarEntity): Avatar {
     return {
       id: avatar.id,
-      fileName: avatar.fileName,
-      mimeType: avatar.mimeType,
-      size: avatar.size,
+      fileName: avatar.file.storageKey,
+      mimeType: avatar.file.mimeType as AvatarMimeType,
+      fileHash: avatar.file.hash,
+      size: avatar.file.size,
       createdAt: avatar.createdAt,
     };
   }
