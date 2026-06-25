@@ -1,13 +1,6 @@
-import {
-  Controller,
-  HttpCode,
-  Post,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Controller, HttpCode, Post, UseInterceptors } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { ZodResponseInterceptor } from '../../common/serialization/zod-response.interceptor';
-import { AuthGuard } from '../auth/auth.guard';
 import { ResetBalancesCommand } from './commands/reset-balances.command-handler';
 import {
   BalanceResetResponse,
@@ -15,7 +8,6 @@ import {
 } from './contracts/balances.contracts';
 
 @Controller('balances')
-@UseGuards(AuthGuard)
 export class BalancesController {
   constructor(private readonly commandBus: CommandBus) {}
 

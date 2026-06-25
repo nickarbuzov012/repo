@@ -1,8 +1,6 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { type MigrationInterface, type QueryRunner } from 'typeorm';
 
-export class CreateActiveUsersIndex1750465000000
-  implements MigrationInterface
-{
+export class CreateActiveUsersIndex1750465000000 implements MigrationInterface {
   name = 'CreateActiveUsersIndex1750465000000';
 
   async up(queryRunner: QueryRunner): Promise<void> {

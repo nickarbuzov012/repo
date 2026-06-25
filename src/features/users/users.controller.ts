@@ -10,14 +10,12 @@ import {
   Query,
   Req,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ZodResponseInterceptor } from '../../common/serialization/zod-response.interceptor';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
-import { AuthGuard } from '../auth/auth.guard';
 import { AuthRequestUser } from '../auth/auth-request-user';
 import {
   ActiveUsersQuery,
@@ -57,7 +55,6 @@ interface AuthenticatedHttpRequest {
 }
 
 @Controller()
-@UseGuards(AuthGuard)
 export class UsersController {
   constructor(
     private readonly commandBus: CommandBus,

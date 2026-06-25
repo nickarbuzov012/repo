@@ -3,7 +3,6 @@ import { CqrsModule } from '@nestjs/cqrs';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from '../users/entities/user.entity';
 import { AuthController } from './auth.controller';
-import { AuthGuard } from './auth.guard';
 import { LoginUserHandler } from './commands/login-user.command-handler';
 import { RefreshTokenHandler } from './commands/refresh-token.command-handler';
 import { RegisterUserHandler } from './commands/register-user.command-handler';
@@ -27,12 +26,11 @@ const queryHandlers = [GetMeHandler];
   ],
   controllers: [AuthController],
   providers: [
-    AuthGuard,
     PasswordService,
     TokenService,
     ...commandHandlers,
     ...queryHandlers,
   ],
-  exports: [AuthGuard, PasswordService, TokenService],
+  exports: [TypeOrmModule, PasswordService, TokenService],
 })
 export class AuthModule {}

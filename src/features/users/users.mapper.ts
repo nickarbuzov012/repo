@@ -1,5 +1,5 @@
-import { UserEntity } from './entities/user.entity';
-import { UserProfile } from './contracts/users.contracts';
+import { type UserEntity } from './entities/user.entity';
+import { type UserProfile } from './contracts/users.contracts';
 
 export function toUserProfile(user: UserEntity): UserProfile {
   return {

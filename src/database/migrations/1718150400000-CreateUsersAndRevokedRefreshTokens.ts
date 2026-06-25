@@ -1,8 +1,6 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { type MigrationInterface, type QueryRunner } from 'typeorm';
 
-export class CreateUsersAndRevokedRefreshTokens1718150400000
-  implements MigrationInterface
-{
+export class CreateUsersAndRevokedRefreshTokens1718150400000 implements MigrationInterface {
   name = 'CreateUsersAndRevokedRefreshTokens1718150400000';
 
   async up(queryRunner: QueryRunner): Promise<void> {
@@ -77,7 +75,9 @@ export class CreateUsersAndRevokedRefreshTokens1718150400000
       await queryRunner.query(
         'DROP INDEX "IDX_revoked_refresh_tokens_expires_at"',
       );
-      await queryRunner.query('DROP INDEX "IDX_revoked_refresh_tokens_user_id"');
+      await queryRunner.query(
+        'DROP INDEX "IDX_revoked_refresh_tokens_user_id"',
+      );
       await queryRunner.query(
         'ALTER TABLE "revoked_refresh_tokens" DROP CONSTRAINT "FK_revoked_refresh_tokens_user_id"',
       );

@@ -8,6 +8,7 @@ import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { ZodRouteValidationMiddleware } from './infrastructure/validation/zod-route.middleware';
 import { CacheModule } from './providers/cache/cache.module';
+import { PolicyModule } from './policy/policy.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { CacheModule } from './providers/cache/cache.module';
     CacheModule,
     HealthModule,
     AuthModule,
+    PolicyModule,
     UsersModule,
     BalancesModule,
   ],
