@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomUUID } from 'crypto';
+import { parseTtlSeconds } from '../../../common/utils/ttl';
 import { UserRole } from '../../users/entities/user.entity';
 
 export type TokenType = 'access' | 'refresh';
@@ -103,9 +104,9 @@ export class TokenService {
   ): { token: string; expiresAt: number } {
     const now = Math.floor(Date.now() / 1000);
     const expiresAt = now + parseTtlSeconds(ttl);
-    const header = encodeBase64Url({ alg: 'HS256', typ: 'JWT' });
-    const body = encodeBase64Url({ ...payload, iat: now, exp: expiresAt });
-    const signature = sign(`${header}.${body}`, secret);
+    const header = this.encodeBase64Url({ alg: 'HS256', typ: 'JWT' });
+    const body = this.encodeBase64Url({ ...payload, iat: now, exp: expiresAt });
+    const signature = this.signValue(`${header}.${body}`, secret);
 
     return {
       token: `${header}.${body}.${signature}`,
@@ -121,7 +122,7 @@ export class TokenService {
     }
 
     const [header, body, signature] = parts;
-    const expectedSignature = sign(`${header}.${body}`, secret);
+    const expectedSignature = this.signValue(`${header}.${body}`, secret);
 
     if (signature !== expectedSignature) {
       throw new UnauthorizedException('Invalid token');
@@ -137,28 +138,12 @@ export class TokenService {
 
     return payload;
   }
-}
 
-function encodeBase64Url(value: object): string {
-  return Buffer.from(JSON.stringify(value)).toString('base64url');
-}
-
-function sign(value: string, secret: string): string {
-  return createHmac('sha256', secret).update(value).digest('base64url');
-}
-
-function parseTtlSeconds(ttl: string): number {
-  const match = /^(\d+)([smhd])$/.exec(ttl);
-
-  if (!match) {
-    throw new Error(`Invalid TTL format: ${ttl}`);
+  private encodeBase64Url(value: object): string {
+    return Buffer.from(JSON.stringify(value)).toString('base64url');
   }
 
-  const value = Number(match[1]);
-  const unit = match[2];
-
-  if (unit === 's') return value;
-  if (unit === 'm') return value * 60;
-  if (unit === 'h') return value * 60 * 60;
-  return value * 24 * 60 * 60;
+  private signValue(value: string, secret: string): string {
+    return createHmac('sha256', secret).update(value).digest('base64url');
+  }
 }

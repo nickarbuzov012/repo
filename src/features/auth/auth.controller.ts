@@ -11,9 +11,13 @@ import {
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { ZodResponseInterceptor } from '../../common/serialization/zod-response.interceptor';
+import { readCookie } from '../../common/utils/cookies';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { AuthRequestUser } from './auth-request-user';
 import { AuthGuard } from './auth.guard';
+import { LoginUserCommand } from './commands/login-user.command-handler';
+import { RefreshTokenCommand } from './commands/refresh-token.command-handler';
+import { RegisterUserCommand } from './commands/register-user.command-handler';
 import {
   AuthResponse,
   AuthResponseSchema,
@@ -26,29 +30,16 @@ import {
   RegisterRequestSchema,
   LoginRequestSchema,
 } from './contracts/auth.contracts';
-import { LoginUserCommand } from './commands/login-user.command-handler';
-import { RefreshTokenCommand } from './commands/refresh-token.command-handler';
-import { RegisterUserCommand } from './commands/register-user.command-handler';
+import {
+  CookieResponse,
+  setRefreshTokenCookie,
+} from './helpers/refresh-token-cookie.helper';
 import { GetMeQuery } from './queries/get-me.query-handler';
 import { TokenPair } from './services/token.service';
 
 interface AuthenticatedHttpRequest {
   header(name: string): string | undefined;
   user: AuthRequestUser;
-}
-
-interface CookieResponse {
-  cookie(
-    name: string,
-    value: string,
-    options: {
-      httpOnly: boolean;
-      sameSite: 'strict';
-      secure: boolean;
-      path: string;
-      maxAge: number;
-    },
-  ): void;
 }
 
 @Controller('auth')
@@ -126,53 +117,4 @@ export class AuthController {
       new GetMeQuery(request.user.id),
     );
   }
-}
-
-function setRefreshTokenCookie(
-  response: CookieResponse,
-  refreshToken: string,
-): void {
-  response.cookie('refresh_token', refreshToken, {
-    httpOnly: true,
-    sameSite: 'strict',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/api/auth/refresh-token',
-    maxAge: parseTtlMs(process.env.JWT_REFRESH_TTL ?? '7d'),
-  });
-}
-
-function readCookie(
-  cookieHeader: string | undefined,
-  name: string,
-): string | undefined {
-  if (!cookieHeader) {
-    return undefined;
-  }
-
-  const cookie = cookieHeader
-    .split(';')
-    .map((item) => item.trim())
-    .find((item) => item.startsWith(`${name}=`));
-
-  if (!cookie) {
-    return undefined;
-  }
-
-  return decodeURIComponent(cookie.slice(name.length + 1));
-}
-
-function parseTtlMs(ttl: string): number {
-  const match = /^(\d+)([smhd])$/.exec(ttl);
-
-  if (!match) {
-    throw new Error(`Invalid TTL format: ${ttl}`);
-  }
-
-  const value = Number(match[1]);
-  const unit = match[2];
-
-  if (unit === 's') return value * 1000;
-  if (unit === 'm') return value * 60 * 1000;
-  if (unit === 'h') return value * 60 * 60 * 1000;
-  return value * 24 * 60 * 60 * 1000;
 }

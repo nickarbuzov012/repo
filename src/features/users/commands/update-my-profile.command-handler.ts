@@ -1,7 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { FindOptionsWhere, Not, Repository } from 'typeorm';
 import {
   UpdateProfileRequest,
   UserProfile,
@@ -37,15 +37,24 @@ export class UpdateMyProfileHandler
     }
 
     if (command.payload.login || command.payload.email) {
+      const duplicateUserWhere: FindOptionsWhere<UserEntity>[] = [];
+
+      if (command.payload.login) {
+        duplicateUserWhere.push({
+          login: command.payload.login,
+          id: Not(command.userId),
+        });
+      }
+
+      if (command.payload.email) {
+        duplicateUserWhere.push({
+          email: command.payload.email,
+          id: Not(command.userId),
+        });
+      }
+
       const existingUser = await this.usersRepository.findOne({
-        where: [
-          ...(command.payload.login
-            ? [{ login: command.payload.login, id: Not(command.userId) }]
-            : []),
-          ...(command.payload.email
-            ? [{ email: command.payload.email, id: Not(command.userId) }]
-            : []),
-        ],
+        where: duplicateUserWhere,
         withDeleted: true,
       });
 
@@ -54,14 +63,12 @@ export class UpdateMyProfileHandler
       }
     }
 
-    if (command.payload.login !== undefined) user.login = command.payload.login;
-    if (command.payload.email !== undefined) user.email = command.payload.email;
-    if (command.payload.age !== undefined) user.age = command.payload.age;
-    if (command.payload.description !== undefined) {
-      user.description = command.payload.description;
-    }
-    if (command.payload.password !== undefined) {
-      user.passwordHash = await this.passwordService.hash(command.payload.password);
+    const { password, ...profilePayload } = command.payload;
+
+    this.usersRepository.merge(user, profilePayload);
+
+    if (password !== undefined) {
+      user.passwordHash = await this.passwordService.hash(password);
     }
 
     return toUserProfile(await this.usersRepository.save(user));
