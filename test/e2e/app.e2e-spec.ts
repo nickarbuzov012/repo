@@ -1,12 +1,12 @@
 import { createHmac } from 'crypto';
-import { UserEntity } from '../../src/features/users/entities/user.entity';
-import { AvatarEntity } from '../../src/features/users/entities/avatar.entity';
+import { UserEntity } from '../../apps/user-service/src/features/users/entities/user.entity';
+import { AvatarEntity } from '../../apps/user-service/src/features/users/entities/avatar.entity';
 import {
   MinorUnitSchema,
   POSTGRES_INTEGER_MAX,
-} from '../../src/common/validation/minor-unit.schema';
-import { CacheService } from '../../src/providers/cache/cache.service';
-import { E2eTestApp, createE2eTestApp, requestJson } from './test-app';
+} from '../../apps/user-service/src/common/validation/minor-unit.schema';
+import { CacheService } from '../../apps/user-service/src/providers/cache/cache.service';
+import { type E2eTestApp, createE2eTestApp, requestJson } from './test-app';
 
 interface AuthResponseBody {
   access_token: string;
@@ -133,10 +133,7 @@ function createExpiredAccessToken(userId: string): string {
       exp: now - 1,
     }),
   ).toString('base64url');
-  const signature = createHmac(
-    'sha256',
-    process.env.JWT_ACCESS_SECRET!,
-  )
+  const signature = createHmac('sha256', process.env.JWT_ACCESS_SECRET!)
     .update(`${header}.${payload}`)
     .digest('base64url');
 
@@ -900,10 +897,7 @@ describe('application endpoints (e2e)', () => {
       avatars.push(upload.body);
     }
 
-    const sixthUpload = await uploadAvatar(
-      testApp.baseUrl,
-      owner.access_token,
-    );
+    const sixthUpload = await uploadAvatar(testApp.baseUrl, owner.access_token);
     expect(sixthUpload.status).toBe(409);
 
     const unsupportedFile = await uploadAvatar(
@@ -937,10 +931,7 @@ describe('application endpoints (e2e)', () => {
     );
     expect(ownerDelete.status).toBe(204);
 
-    const replacement = await uploadAvatar(
-      testApp.baseUrl,
-      owner.access_token,
-    );
+    const replacement = await uploadAvatar(testApp.baseUrl, owner.access_token);
     expect(replacement.status).toBe(201);
 
     const repeatedDelete = await requestJson(

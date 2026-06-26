@@ -1,7 +1,7 @@
-import { INestApplication } from '@nestjs/common';
+import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { DataSource } from 'typeorm';
-import { AppModule } from '../../src/app.module';
+import { AppModule } from '../../apps/user-service/src/app.module';
 
 export interface E2eTestApp {
   app: INestApplication;
@@ -55,8 +55,7 @@ export async function requestJson<T = unknown>(
   const response = await fetch(`${baseUrl}${path}`, {
     method,
     headers,
-    body:
-      options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
   const text = await response.text();
 
