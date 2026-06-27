@@ -6,7 +6,7 @@
   "sourceRoot": "apps/user-service/src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "webpack": false,
+    "webpack": true,
     "tsConfigPath": "apps/user-service/tsconfig.app.json"
   },
   "projects": {

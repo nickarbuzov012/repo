@@ -9,6 +9,8 @@ import { DataSource, In } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { POSTGRES_INTEGER_MAX } from '../../../common/validation/minor-unit.schema';
 import { UserCacheService } from '../../../providers/cache/user-cache.service';
+import { CacheService } from '../../../providers/cache/cache.service';
+import { OutboxService } from '../../../providers/outbox/outbox.service';
 import { UserEntity } from '../entities/user.entity';
 
 export class TransferBalanceCommand {
@@ -29,6 +31,7 @@ export class TransferBalanceHandler implements ICommandHandler<
   constructor(
     private readonly dataSource: DataSource,
     private readonly cacheService: UserCacheService,
+    private readonly outboxService: OutboxService,
   ) {}
 
   async execute(command: TransferBalanceCommand): Promise<void> {
@@ -91,6 +94,14 @@ export class TransferBalanceHandler implements ICommandHandler<
         .where('id = :recipientId', { recipientId: command.recipientId })
         .setParameters({ amountCents: command.amountCents })
         .execute();
+
+      await this.outboxService.addBalanceTransferred(manager, {
+        transferId,
+        senderId: command.senderId,
+        recipientId: command.recipientId,
+        amountCents: command.amountCents,
+        occurredAt: new Date().toISOString(),
+      });
     });
 
     await Promise.all([

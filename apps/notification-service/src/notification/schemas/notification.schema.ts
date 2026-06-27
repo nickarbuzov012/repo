@@ -8,7 +8,7 @@ export type NotificationDocument = HydratedDocument<NotificationEntity>;
   timestamps: true,
 })
 export class NotificationEntity {
-  @Prop({ required: true, index: true })
+  @Prop({ required: true, index: true, unique: true })
   transferId: string;
 
   @Prop({ required: true, index: true })
@@ -17,7 +17,7 @@ export class NotificationEntity {
   @Prop({ required: true, index: true })
   recipientId: string;
 
-  @Prop({ required: true, min: 1 })
+  @Prop({ required: true, min: 0 })
   amountCents: number;
 
   @Prop({ required: true })

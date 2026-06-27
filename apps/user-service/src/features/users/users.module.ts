@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { S3Module } from '../../providers/s3/s3.module';
 import { FileEntity } from '../../providers/files/entities/file.entity';
+import { OutboxModule } from '../../providers/outbox/outbox.module';
 import { DeleteAvatarHandler } from './commands/delete-avatar.command-handler';
 import { DeleteMyProfileHandler } from './commands/delete-my-profile.command-handler';
 import { TransferBalanceHandler } from './commands/transfer-balance.command-handler';
@@ -30,6 +31,7 @@ const queryHandlers = [ListUsersHandler, ListActiveUsersHandler];
     TypeOrmModule.forFeature([UserEntity, AvatarEntity, FileEntity]),
     AuthModule,
     S3Module,
+    OutboxModule,
   ],
   controllers: [UsersController],
   providers: [...commandHandlers, ...queryHandlers],
