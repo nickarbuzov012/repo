@@ -164,6 +164,34 @@ ws://localhost:3001/socket.io/?EIO=4&transport=websocket
 аутентификации сокет попадает в комнату с id пользователя и слушает событие
 `notification`.
 
+События `notification` ожидают Socket.io callback ack. Если клиент не подтвердил
+получение, уведомление остаётся не подтверждённым в MongoDB и будет
+переотправлено при следующем подключении пользователя. Также доступен ручной ack:
+
+```text
+notification:ack
+```
+
+Payload:
+
+```json
+{
+  "notificationId": "transfer-id"
+}
+```
+
+Локальный playground для проверки:
+
+```text
+docs/websocket-playground.html
+```
+
+Playground получает имена Socket.io событий с backend endpoint:
+
+```text
+GET http://localhost:3001/api/notifications/websocket-events
+```
+
 Тестовая ручная отправка уведомления:
 
 ```text

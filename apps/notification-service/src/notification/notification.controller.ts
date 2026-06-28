@@ -1,4 +1,5 @@
-import { Body, Controller, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { NOTIFICATION_SOCKET_EVENTS } from '@app/common';
 import { NotificationService } from './notification.service';
 import { type SendNotificationRequest } from './notification.types';
 
@@ -14,5 +15,10 @@ export class NotificationController {
     await this.notificationService.sendManualNotification(body);
 
     return { sent: true };
+  }
+
+  @Get('websocket-events')
+  getWebSocketEvents(): typeof NOTIFICATION_SOCKET_EVENTS {
+    return NOTIFICATION_SOCKET_EVENTS;
   }
 }

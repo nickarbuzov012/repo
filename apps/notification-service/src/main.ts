@@ -6,6 +6,9 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(NotificationServiceModule);
 
   app.setGlobalPrefix('api');
+  app.enableCors({
+    origin: true,
+  });
 
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.KAFKA,
@@ -17,6 +20,9 @@ async function bootstrap(): Promise<void> {
       consumer: {
         groupId:
           process.env.KAFKA_NOTIFICATION_GROUP_ID ?? 'notification-service',
+      },
+      run: {
+        autoCommit: false,
       },
     },
   });

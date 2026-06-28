@@ -10,6 +10,7 @@ export interface BalanceTransferredEvent {
 }
 
 export interface UserNotificationPayload {
+  notificationId: string;
   type: 'balance_transfer';
   transferId: string;
   senderId: string;

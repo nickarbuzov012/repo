@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notification WebSocket Playground</title>
+    <style>
+      body {
+        color: #1d2433;
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        margin: 0;
+        background: #f6f7f9;
+      }
+
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px 20px;
+      }
+
+      h1 {
+        font-size: 28px;
+        margin: 0 0 20px;
+      }
+
+      section {
+        background: #ffffff;
+        border: 1px solid #d9dee7;
+        border-radius: 8px;
+        padding: 18px;
+        margin-bottom: 16px;
+      }
+
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      input,
+      textarea {
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px solid #c7ceda;
+        border-radius: 6px;
+        padding: 10px 12px;
+        font: inherit;
+        margin-bottom: 12px;
+        background: #ffffff;
+      }
+
+      textarea {
+        min-height: 88px;
+        resize: vertical;
+      }
+
+      button {
+        border: 0;
+        border-radius: 6px;
+        background: #24466f;
+        color: #ffffff;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 600;
+        padding: 10px 14px;
+        margin-right: 8px;
+      }
+
+      button.secondary {
+        background: #596579;
+      }
+
+      pre {
+        background: #101828;
+        border-radius: 8px;
+        color: #d9e2f1;
+        min-height: 280px;
+        overflow: auto;
+        padding: 14px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Notification WebSocket Playground</h1>
+
+      <section>
+        <label for="serverUrl">Socket.io server URL</label>
+        <input id="serverUrl" value="http://localhost:3001" />
+
+        <label for="token">Access JWT</label>
+        <textarea id="token" placeholder="Paste access token"></textarea>
+
+        <button id="connect">Connect</button>
+        <button id="disconnect" class="secondary">Disconnect</button>
+      </section>
+
+      <section>
+        <label for="notificationId">Manual ack notificationId</label>
+        <input id="notificationId" placeholder="transferId / notificationId" />
+        <button id="ack">Send notification:ack</button>
+      </section>
+
+      <pre id="log"></pre>
+    </main>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+      let socket;
+      let socketEvents = {
+        notification: 'notification',
+        notificationAck: 'notification:ack',
+      };
+
+      const logEl = document.getElementById('log');
+      const log = (message, data) => {
+        const line = data
+          ? `${new Date().toISOString()} ${message} ${JSON.stringify(data)}`
+          : `${new Date().toISOString()} ${message}`;
+        logEl.textContent += `${line}\n`;
+        logEl.scrollTop = logEl.scrollHeight;
+      };
+
+      const loadSocketEvents = async (serverUrl) => {
+        const response = await fetch(
+          `${serverUrl}/api/notifications/websocket-events`,
+        );
+        socketEvents = await response.json();
+        log('loaded websocket events', socketEvents);
+      };
+
+      document.getElementById('connect').addEventListener('click', async () => {
+        const serverUrl = document.getElementById('serverUrl').value.trim();
+        const token = document.getElementById('token').value.trim();
+
+        try {
+          await loadSocketEvents(serverUrl);
+        } catch (error) {
+          log('using fallback websocket events', { message: error.message });
+        }
+
+        socket = io(serverUrl, {
+          auth: { token },
+          transports: ['websocket'],
+        });
+
+        socket.on('connect', () => log('connected', { socketId: socket.id }));
+        socket.on('disconnect', (reason) => log('disconnected', { reason }));
+        socket.on('connect_error', (error) =>
+          log('connect_error', { message: error.message }),
+        );
+        socket.on(socketEvents.notification, (payload, ack) => {
+          log(socketEvents.notification, payload);
+
+          if (typeof ack === 'function') {
+            ack({ received: true, notificationId: payload.notificationId });
+            log('callback ack sent', {
+              notificationId: payload.notificationId,
+            });
+          }
+        });
+      });
+
+      document.getElementById('disconnect').addEventListener('click', () => {
+        socket?.disconnect();
+      });
+
+      document.getElementById('ack').addEventListener('click', () => {
+        const notificationId = document
+          .getElementById('notificationId')
+          .value.trim();
+
+        socket?.emit(
+          socketEvents.notificationAck,
+          { notificationId },
+          (response) => {
+            log('manual ack response', response);
+          },
+        );
+      });
+    </script>
+  </body>
+</html>
