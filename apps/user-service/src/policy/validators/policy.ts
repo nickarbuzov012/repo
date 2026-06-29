@@ -1,4 +1,5 @@
 import {
+  EndpointPoliciesResponseSchema,
   EndpointPolicySchema,
   UpdateEndpointPolicyRequestSchema,
 } from '../contracts/policy.contracts';
@@ -12,6 +13,13 @@ const adminPolicy = {
 };
 
 export const policyZSlice = {
+  'GET /policy': {
+    tags,
+    summary: 'List endpoint policies',
+    auth: true,
+    policy: adminPolicy,
+    res: { status: 200, schema: EndpointPoliciesResponseSchema },
+  },
   'PUT /policy': {
     tags,
     summary: 'Update endpoint policy',

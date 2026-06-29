@@ -1,8 +1,10 @@
 import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { createHash } from 'crypto';
+import { createReadStream } from 'node:fs';
+import { unlink } from 'node:fs/promises';
 import { DataSource, IsNull } from 'typeorm';
 import { FileEntity } from '../../../providers/files/entities/file.entity';
+import { FileHashService } from '../../../providers/files/file-hash.service';
 import { S3Service } from '../../../providers/s3/s3.service';
 import type { Avatar } from '../contracts/users.contracts';
 import { AvatarEntity } from '../entities/avatar.entity';
@@ -36,23 +38,27 @@ export class UploadAvatarHandler implements ICommandHandler<
     private readonly dataSource: DataSource,
     private readonly s3Service: S3Service,
     private readonly cacheService: UserCacheService,
+    private readonly fileHashService: FileHashService,
   ) {}
 
   async execute(command: UploadAvatarCommand): Promise<Avatar> {
     const extension = extensionsByMimeType[command.file.mimetype];
     const storageKey = this.s3Service.createFileName(extension);
     const hashAlgorithm = 'sha256';
-    const fileHash = createHash(hashAlgorithm)
-      .update(command.file.buffer)
-      .digest('hex');
-
-    await this.s3Service.uploadObject({
+    const fileHashPromise = this.fileHashService.hashFile(
+      hashAlgorithm,
+      command.file.path,
+    );
+    const uploadPromise = this.s3Service.uploadObject({
       key: storageKey,
-      body: command.file.buffer,
+      body: createReadStream(command.file.path),
       contentType: command.file.mimetype,
+      contentLength: command.file.size,
     });
 
     try {
+      const [fileHash] = await Promise.all([fileHashPromise, uploadPromise]);
+
       const avatar = await this.dataSource.transaction(async (manager) => {
         const user = await manager.findOne(UserEntity, {
           where: { id: command.userId },
@@ -102,6 +108,20 @@ export class UploadAvatarHandler implements ICommandHandler<
     } catch (error: unknown) {
       await this.removeOrphanedObject(storageKey);
       throw error;
+    } finally {
+      await this.removeTemporaryFile(command.file.path);
+    }
+  }
+
+  private async removeTemporaryFile(filePath: string): Promise<void> {
+    try {
+      await unlink(filePath);
+    } catch (error: unknown) {
+      this.logger.warn(
+        `Failed to remove temporary avatar file: path=${filePath} reason=${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
   }
 

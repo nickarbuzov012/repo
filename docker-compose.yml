@@ -87,6 +87,19 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
+  kafka-init:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: users_api_kafka_init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command:
+      [
+        'bash',
+        '-lc',
+        'kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic balance.transferred --partitions 1 --replication-factor 1',
+      ]
+
   mongo:
     image: mongo:7
     container_name: users_api_mongo

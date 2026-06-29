@@ -1,6 +1,7 @@
 import { createHmac } from 'crypto';
 import { UserEntity } from '../../apps/user-service/src/features/users/entities/user.entity';
 import { AvatarEntity } from '../../apps/user-service/src/features/users/entities/avatar.entity';
+import { FileEntity } from '../../apps/user-service/src/providers/files/entities/file.entity';
 import {
   MinorUnitSchema,
   POSTGRES_INTEGER_MAX,
@@ -950,6 +951,7 @@ describe('application endpoints (e2e)', () => {
   it('lists active users with all filters, latest avatar and stable pagination', async () => {
     const usersRepository = testApp.dataSource.getRepository(UserEntity);
     const avatarsRepository = testApp.dataSource.getRepository(AvatarEntity);
+    const filesRepository = testApp.dataSource.getRepository(FileEntity);
     const passwordHash = 'not-used-by-this-test';
 
     const users = await usersRepository.save([
@@ -986,24 +988,39 @@ describe('application endpoints (e2e)', () => {
     const baseDate = new Date('2026-01-01T00:00:00.000Z');
 
     for (const user of users) {
-      await avatarsRepository.save(
-        [0, 1, 2].map((index) =>
-          avatarsRepository.create({
-            userId: user.id,
-            fileName: `active-query/${user.id}/${index}.png`,
+      for (const index of [0, 1, 2]) {
+        const file = await filesRepository.save(
+          filesRepository.create({
+            storageKey: `active-query/${user.id}/${index}.png`,
             mimeType: 'image/png',
             size: 100 + index,
+            hash: `${user.id}-${index}`,
+            hashAlgorithm: 'sha256',
+          }),
+        );
+
+        await avatarsRepository.save(
+          avatarsRepository.create({
+            userId: user.id,
+            fileId: file.id,
             createdAt: new Date(baseDate.getTime() + index * 1000),
           }),
-        ),
-      );
+        );
+      }
     }
+    const deletedFile = await filesRepository.save(
+      filesRepository.create({
+        storageKey: `active-query/${activeA.id}/deleted.png`,
+        mimeType: 'image/png',
+        size: 999,
+        hash: `${activeA.id}-deleted`,
+        hashAlgorithm: 'sha256',
+      }),
+    );
     await avatarsRepository.save(
       avatarsRepository.create({
         userId: activeA.id,
-        fileName: `active-query/${activeA.id}/deleted.png`,
-        mimeType: 'image/png',
-        size: 999,
+        fileId: deletedFile.id,
         createdAt: new Date(baseDate.getTime() + 10_000),
         deletedAt: new Date(baseDate.getTime() + 11_000),
       }),

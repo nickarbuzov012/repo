@@ -14,6 +14,11 @@ import {
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { diskStorage } from 'multer';
 import { ZodResponseInterceptor } from '../../common/serialization/zod-response.interceptor';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { AuthRequestUser } from '../auth/auth-request-user';
@@ -53,6 +58,9 @@ import {
 interface AuthenticatedHttpRequest {
   user: AuthRequestUser;
 }
+
+const avatarUploadTempDirectory = join(tmpdir(), 'users-api-avatar-uploads');
+mkdirSync(avatarUploadTempDirectory, { recursive: true });
 
 @Controller()
 export class UsersController {
@@ -112,7 +120,15 @@ export class UsersController {
 
   @Post('profile/my/avatars')
   @UseInterceptors(
-    FileInterceptor('file', { limits: { fileSize: MAX_AVATAR_SIZE_BYTES } }),
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_AVATAR_SIZE_BYTES },
+      storage: diskStorage({
+        destination: avatarUploadTempDirectory,
+        filename: (_request, file, callback) => {
+          callback(null, `${randomUUID()}-${file.originalname}`);
+        },
+      }),
+    }),
     new ZodResponseInterceptor(AvatarSchema),
   )
   async uploadAvatar(

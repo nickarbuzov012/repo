@@ -17,13 +17,14 @@ export class OutboxService {
     manager: EntityManager,
     event: BalanceTransferredEvent,
   ): Promise<void> {
-    await manager.insert(OutboxEventEntity, {
-      topic: BALANCE_TRANSFERRED_TOPIC,
-      eventKey: event.transferId,
-      payload: event as unknown as Record<string, unknown>,
-      status: OutboxEventStatus.Pending,
-      nextAttemptAt: new Date(),
-    });
+    const outboxEvent = new OutboxEventEntity();
+    outboxEvent.topic = BALANCE_TRANSFERRED_TOPIC;
+    outboxEvent.eventKey = event.transferId;
+    outboxEvent.payload = event as unknown as Record<string, unknown>;
+    outboxEvent.status = OutboxEventStatus.Pending;
+    outboxEvent.nextAttemptAt = new Date();
+
+    await manager.save(OutboxEventEntity, outboxEvent);
 
     this.logger.log(
       `Outbox event created: topic=${BALANCE_TRANSFERRED_TOPIC} transferId=${event.transferId}`,

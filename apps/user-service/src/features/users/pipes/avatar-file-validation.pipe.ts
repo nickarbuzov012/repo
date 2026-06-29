@@ -6,8 +6,8 @@ export const MAX_AVATAR_SIZE_BYTES = 10 * 1024 * 1024;
 const allowedMimeTypes = new Set<string>(AVATAR_MIME_TYPES);
 
 interface UploadedFileCandidate {
-  buffer: Buffer;
   mimetype: string;
+  path: string;
   size: number;
 }
 

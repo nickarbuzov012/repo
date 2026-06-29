@@ -17,6 +17,7 @@
     "format": "prettier --write \"{apps,libs,test}/**/*.ts\" \"*.{json,md,yml,yaml}\" \"apps/**/*.json\" \"libs/**/*.json\"",
     "test": "jest --config test/jest-e2e.json --runInBand",
     "test:e2e": "jest --config test/jest-e2e.json --runInBand",
+    "check:upload-blocking": "node scripts/check-upload-blocking.mjs",
     "migration:run": "typeorm-ts-node-commonjs -d apps/user-service/src/database/data-source.ts migration:run",
     "migration:generate": "typeorm-ts-node-commonjs -d apps/user-service/src/database/data-source.ts migration:generate",
     "prepare": "husky"

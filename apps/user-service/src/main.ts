@@ -7,6 +7,9 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
   app.setGlobalPrefix('api');
+  app.enableCors({
+    origin: true,
+  });
 
   SwaggerModule.setup('docs', app, createOpenApiDocument());
 

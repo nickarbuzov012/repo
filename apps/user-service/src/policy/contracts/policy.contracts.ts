@@ -23,6 +23,10 @@ export const EndpointPolicySchema = z
   })
   .meta({ id: 'EndpointPolicy' });
 
+export const EndpointPoliciesResponseSchema = z
+  .array(EndpointPolicySchema)
+  .meta({ id: 'EndpointPoliciesResponse' });
+
 export const UpdateEndpointPolicyRequestSchema = z
   .strictObject({
     method: HttpMethodSchema,
@@ -42,6 +46,9 @@ export const UpdateEndpointPolicyRequestSchema = z
   .meta({ id: 'UpdateEndpointPolicyRequest' });
 
 export type EndpointPolicy = z.input<typeof EndpointPolicySchema>;
+export type EndpointPoliciesResponse = z.input<
+  typeof EndpointPoliciesResponseSchema
+>;
 export type UpdateEndpointPolicyRequest = z.infer<
   typeof UpdateEndpointPolicyRequestSchema
 >;

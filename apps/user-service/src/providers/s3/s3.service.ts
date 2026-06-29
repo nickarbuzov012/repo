@@ -32,6 +32,7 @@ export class S3Service {
         Key: input.key,
         Body: input.body,
         ContentType: input.contentType,
+        ContentLength: input.contentLength,
       }),
     );
 
