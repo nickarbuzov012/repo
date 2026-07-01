@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { DataSource } from 'typeorm';
-import { CacheService } from '../../../providers/cache/cache.service';
+import { UserCacheService } from '../../../providers/cache/user-cache.service';
 import { UserEntity } from '../../users/entities/user.entity';
 import {
   BALANCE_RESET_JOB,
@@ -19,7 +19,7 @@ export class BalanceResetProcessor extends WorkerHost {
 
   constructor(
     private readonly dataSource: DataSource,
-    private readonly cacheService: CacheService,
+    private readonly cacheService: UserCacheService,
   ) {
     super();
   }

@@ -9,7 +9,7 @@ import {
 import { UserEntity } from '../entities/user.entity';
 import { toUserProfile } from '../users.mapper';
 import { PasswordService } from '../../auth/services/password.service';
-import { CacheService } from '../../../providers/cache/cache.service';
+import { UserCacheService } from '../../../providers/cache/user-cache.service';
 
 export class UpdateMyProfileCommand {
   constructor(
@@ -19,16 +19,17 @@ export class UpdateMyProfileCommand {
 }
 
 @CommandHandler(UpdateMyProfileCommand)
-export class UpdateMyProfileHandler
-  implements ICommandHandler<UpdateMyProfileCommand, UserProfile>
-{
+export class UpdateMyProfileHandler implements ICommandHandler<
+  UpdateMyProfileCommand,
+  UserProfile
+> {
   private readonly logger = new Logger(UpdateMyProfileHandler.name);
 
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
     private readonly passwordService: PasswordService,
-    private readonly cacheService: CacheService,
+    private readonly cacheService: UserCacheService,
   ) {}
 
   async execute(command: UpdateMyProfileCommand): Promise<UserProfile> {
@@ -63,7 +64,9 @@ export class UpdateMyProfileHandler
       });
 
       if (existingUser) {
-        throw new ConflictException('User with this login or email already exists');
+        throw new ConflictException(
+          'User with this login or email already exists',
+        );
       }
     }
 

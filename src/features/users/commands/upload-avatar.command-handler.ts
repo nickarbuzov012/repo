@@ -9,7 +9,7 @@ import { AvatarEntity } from '../entities/avatar.entity';
 import { UserEntity } from '../entities/user.entity';
 import type { UploadedAvatarFile } from '../pipes/avatar-file-validation.pipe';
 import type { AvatarMimeType } from '../avatar.constants';
-import { CacheService } from '../../../providers/cache/cache.service';
+import { UserCacheService } from '../../../providers/cache/user-cache.service';
 
 const MAX_ACTIVE_AVATARS = 5;
 
@@ -35,7 +35,7 @@ export class UploadAvatarHandler implements ICommandHandler<
   constructor(
     private readonly dataSource: DataSource,
     private readonly s3Service: S3Service,
-    private readonly cacheService: CacheService,
+    private readonly cacheService: UserCacheService,
   ) {}
 
   async execute(command: UploadAvatarCommand): Promise<Avatar> {

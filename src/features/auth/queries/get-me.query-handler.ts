@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MeResponse } from '../contracts/auth.contracts';
 import { UserEntity } from '../../users/entities/user.entity';
-import { CacheService } from '../../../providers/cache/cache.service';
+import { UserCacheService } from '../../../providers/cache/user-cache.service';
 
 export class GetMeQuery {
   constructor(public readonly userId: string) {}
@@ -15,7 +15,7 @@ export class GetMeHandler implements IQueryHandler<GetMeQuery, MeResponse> {
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
-    private readonly cacheService: CacheService,
+    private readonly cacheService: UserCacheService,
   ) {}
 
   async execute(query: GetMeQuery): Promise<MeResponse> {

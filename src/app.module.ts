@@ -10,17 +10,36 @@ import { ZodRouteValidationMiddleware } from './infrastructure/validation/zod-ro
 import { CacheModule } from './providers/cache/cache.module';
 import { PolicyModule } from './policy/policy.module';
 
+const getEnvFilePath = (): string[] => {
+  if (process.env.NODE_ENV === 'test') {
+    return ['.env.test', '.env'];
+  }
+
+  return ['.env'];
+};
+
+const getRedisPort = (configService: ConfigService): number => {
+  const port = Number(configService.getOrThrow<string>('REDIS_PORT'));
+
+  if (!Number.isInteger(port)) {
+    throw new Error('REDIS_PORT must be an integer');
+  }
+
+  return port;
+};
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: getEnvFilePath(),
     }),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         connection: {
-          host: configService.get<string>('REDIS_HOST', 'localhost'),
-          port: Number(configService.get<string>('REDIS_PORT', '6379')),
+          host: configService.getOrThrow<string>('REDIS_HOST'),
+          port: getRedisPort(configService),
         },
       }),
     }),

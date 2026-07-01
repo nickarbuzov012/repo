@@ -2,8 +2,6 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { CacheStore } from './cache-store';
 import { CACHE_STORE, CACHE_TTL_SECONDS } from './cache.constants';
 
-const USERS_LIST_VERSION_KEY = 'users-api:users:list:version';
-
 type CacheValue =
   | null
   | boolean
@@ -47,69 +45,23 @@ export class CacheService {
     }
   }
 
-  async usersListKey(
-    scope: string,
-    parameters: Record<string, number | string | undefined>,
-  ): Promise<string> {
-    const version = await this.getUsersListVersion();
-    const normalizedParameters = Object.entries(parameters)
-      .filter(
-        (entry): entry is [string, number | string] => entry[1] !== undefined,
-      )
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, value]) => `${key}:${this.normalizeKeyValue(value)}`)
-      .join(':');
-
-    return `users-api:users:list:v${version}:${scope}:${normalizedParameters}`;
-  }
-
-  userProfileKey(userId: string): string {
-    return `users-api:users:profile:${userId}`;
-  }
-
-  async invalidateUser(userId: string): Promise<void> {
-    await this.invalidateUsers([userId]);
-  }
-
-  async invalidateUsers(userIds: string[]): Promise<void> {
-    const uniqueUserIds = [...new Set(userIds)];
-
-    await Promise.all([
-      ...uniqueUserIds.map((userId) => this.delete(this.userProfileKey(userId))),
-      this.incrementUsersListVersion(),
-    ]);
-  }
-
-  async incrementUsersListVersion(): Promise<void> {
+  protected async increment(
+    key: string,
+    operation = 'increment',
+  ): Promise<void> {
     try {
-      await this.store.increment(USERS_LIST_VERSION_KEY);
+      await this.store.increment(key);
     } catch (error: unknown) {
-      this.logFailure('increment version', USERS_LIST_VERSION_KEY, error);
+      this.logFailure(operation, key, error);
     }
   }
 
-  private async getUsersListVersion(): Promise<number> {
-    try {
-      const value = await this.store.get(USERS_LIST_VERSION_KEY);
-      return value === null ? 0 : Number(value);
-    } catch (error: unknown) {
-      this.logFailure('read version', USERS_LIST_VERSION_KEY, error);
-      return 0;
-    }
-  }
-
-  private async delete(key: string): Promise<void> {
+  protected async delete(key: string): Promise<void> {
     try {
       await this.store.delete(key);
     } catch (error: unknown) {
       this.logFailure('delete', key, error);
     }
-  }
-
-  private normalizeKeyValue(value: number | string): string {
-    return encodeURIComponent(
-      typeof value === 'string' ? value.trim().toLowerCase() : String(value),
-    );
   }
 
   private toCacheValue(value: unknown): CacheValue {

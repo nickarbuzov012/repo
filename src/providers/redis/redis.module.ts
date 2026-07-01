@@ -5,6 +5,16 @@ import { CACHE_STORE } from '../cache/cache.constants';
 import { REDIS_CLIENT } from './redis.constants';
 import { RedisCacheAdapter } from './redis-cache.adapter';
 
+const getRedisPort = (configService: ConfigService): number => {
+  const port = Number(configService.getOrThrow<string>('REDIS_PORT'));
+
+  if (!Number.isInteger(port)) {
+    throw new Error('REDIS_PORT must be an integer');
+  }
+
+  return port;
+};
+
 @Global()
 @Module({
   providers: [
@@ -13,8 +23,8 @@ import { RedisCacheAdapter } from './redis-cache.adapter';
       inject: [ConfigService],
       useFactory: (configService: ConfigService): Redis =>
         new Redis({
-          host: configService.get('REDIS_HOST', 'localhost'),
-          port: configService.get('REDIS_PORT', 6379),
+          host: configService.getOrThrow<string>('REDIS_HOST'),
+          port: getRedisPort(configService),
           lazyConnect: true,
           maxRetriesPerRequest: 1,
           connectTimeout: 500,

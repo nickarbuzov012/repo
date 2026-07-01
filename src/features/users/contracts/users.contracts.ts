@@ -3,6 +3,8 @@ import { MinorUnitSchema } from '../../../common/validation/minor-unit.schema';
 import { UserRole } from '../entities/user.entity';
 import { AVATAR_MIME_TYPES } from '../avatar.constants';
 
+const MAX_AVATAR_SIZE_BYTES = 10 * 1024 * 1024; // 10 mb
+
 export const AvatarSchema = z
   .object({
     id: z.uuid().meta({ example: '8b93b7e0-21bb-4a8c-9a23-812c1a22ad16' }),
@@ -14,11 +16,7 @@ export const AvatarSchema = z
       example:
         'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     }),
-    size: z
-      .number()
-      .int()
-      .positive()
-      .max(10 * 1024 * 1024),
+    size: z.number().int().positive().max(MAX_AVATAR_SIZE_BYTES),
     createdAt: z.date().transform((date) => date.toISOString()),
   })
   .meta({ id: 'Avatar' });

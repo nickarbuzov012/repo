@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { S3Service } from '../../../providers/s3/s3.service';
 import { AvatarEntity } from '../entities/avatar.entity';
-import { CacheService } from '../../../providers/cache/cache.service';
+import { UserCacheService } from '../../../providers/cache/user-cache.service';
 
 export class DeleteAvatarCommand {
   constructor(
@@ -24,7 +24,7 @@ export class DeleteAvatarHandler implements ICommandHandler<
     @InjectRepository(AvatarEntity)
     private readonly avatarsRepository: Repository<AvatarEntity>,
     private readonly s3Service: S3Service,
-    private readonly cacheService: CacheService,
+    private readonly cacheService: UserCacheService,
   ) {}
 
   async execute(command: DeleteAvatarCommand): Promise<void> {

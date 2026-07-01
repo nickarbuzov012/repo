@@ -7,20 +7,21 @@ import {
 } from '../contracts/users.contracts';
 import { UserEntity } from '../entities/user.entity';
 import { toUserProfile } from '../users.mapper';
-import { CacheService } from '../../../providers/cache/cache.service';
+import { UserCacheService } from '../../../providers/cache/user-cache.service';
 
 export class ListUsersQuery {
   constructor(public readonly payload: UsersListQuery) {}
 }
 
 @QueryHandler(ListUsersQuery)
-export class ListUsersHandler
-  implements IQueryHandler<ListUsersQuery, UsersListResponse>
-{
+export class ListUsersHandler implements IQueryHandler<
+  ListUsersQuery,
+  UsersListResponse
+> {
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
-    private readonly cacheService: CacheService,
+    private readonly cacheService: UserCacheService,
   ) {}
 
   async execute(query: ListUsersQuery): Promise<UsersListResponse> {

@@ -8,7 +8,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { DataSource, In } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { POSTGRES_INTEGER_MAX } from '../../../common/validation/minor-unit.schema';
-import { CacheService } from '../../../providers/cache/cache.service';
+import { UserCacheService } from '../../../providers/cache/user-cache.service';
 import { UserEntity } from '../entities/user.entity';
 
 export class TransferBalanceCommand {
@@ -20,14 +20,15 @@ export class TransferBalanceCommand {
 }
 
 @CommandHandler(TransferBalanceCommand)
-export class TransferBalanceHandler
-  implements ICommandHandler<TransferBalanceCommand, void>
-{
+export class TransferBalanceHandler implements ICommandHandler<
+  TransferBalanceCommand,
+  void
+> {
   private readonly logger = new Logger(TransferBalanceHandler.name);
 
   constructor(
     private readonly dataSource: DataSource,
-    private readonly cacheService: CacheService,
+    private readonly cacheService: UserCacheService,
   ) {}
 
   async execute(command: TransferBalanceCommand): Promise<void> {

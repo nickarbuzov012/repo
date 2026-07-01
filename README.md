@@ -25,12 +25,14 @@ npm install
 
 ```bash
 cp .env.example .env
+cp .env.test.example .env.test
 ```
 
 На Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
+Copy-Item .env.test.example .env.test
 ```
 
 ## Запуск инфраструктуры
@@ -41,10 +43,17 @@ Copy-Item .env.example .env
 docker compose up -d
 ```
 
+Запустить тестовую БД:
+
+```bash
+docker compose --env-file .env.test -f docker-compose.test.yml up -d
+```
+
 Остановить инфраструктуру:
 
 ```bash
 docker compose down
+docker compose -f docker-compose.test.yml down
 ```
 
 PostgreSQL:

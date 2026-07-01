@@ -4,7 +4,7 @@ import type {
   ActiveUsersQuery as ActiveUsersQueryPayload,
   ActiveUsersResponse,
 } from '../contracts/users.contracts';
-import { CacheService } from '../../../providers/cache/cache.service';
+import { UserCacheService } from '../../../providers/cache/user-cache.service';
 
 interface ActiveUserRow {
   id: string | null;
@@ -31,7 +31,7 @@ export class ListActiveUsersHandler implements IQueryHandler<
 > {
   constructor(
     private readonly dataSource: DataSource,
-    private readonly cacheService: CacheService,
+    private readonly cacheService: UserCacheService,
   ) {}
 
   async execute(query: ListActiveUsersQuery): Promise<ActiveUsersResponse> {
