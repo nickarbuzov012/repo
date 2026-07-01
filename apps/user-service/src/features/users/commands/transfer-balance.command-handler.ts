@@ -9,7 +9,6 @@ import { DataSource, In } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { POSTGRES_INTEGER_MAX } from '../../../common/validation/minor-unit.schema';
 import { UserCacheService } from '../../../providers/cache/user-cache.service';
-import { CacheService } from '../../../providers/cache/cache.service';
 import { OutboxService } from '../../../providers/outbox/outbox.service';
 import { UserEntity } from '../entities/user.entity';
 
