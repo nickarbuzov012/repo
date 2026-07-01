@@ -1,7 +1,9 @@
 ﻿# Users API
 
-REST API на NestJS, PostgreSQL, TypeORM и CQRS. Локальная инфраструктура также
-включает Redis, BullMQ-очереди и совместимое с S3 объектное хранилище MinIO.
+Монорепозиторий NestJS с `user-service` и `notification-service`. User service
+работает с PostgreSQL, TypeORM и CQRS, публикует события переводов в Kafka.
+Notification service принимает события Kafka, сохраняет уведомления в MongoDB и
+отправляет их клиентам по Socket.io.
 
 ## Требования
 
@@ -87,6 +89,16 @@ MinIO:
 Bucket создаётся приложением лениво перед первой операцией загрузки. В базе
 данных хранится только сгенерированное имя файла, без endpoint или домена MinIO.
 
+Kafka UI:
+
+- URL: `http://localhost:${KAFKA_UI_PORT}`
+- bootstrap server внутри compose-сети: `kafka:29092`
+- bootstrap server для локального Node.js: значение `KAFKA_BROKER`
+
+MongoDB:
+
+- URI для notification-service: значение `MONGO_URI`
+
 Для подключения сервера в pgAdmin:
 
 - host: `postgres`
@@ -97,23 +109,36 @@ Bucket создаётся приложением лениво перед пер�
 
 ## Запуск приложения
 
-Development mode:
+User service в development mode:
 
 ```bash
-npm run start:dev
+npm run start:user-service:dev
+```
+
+Notification service в development mode:
+
+```bash
+npm run start:notification-service:dev
 ```
 
 Production-like start after build:
 
 ```bash
 npm run build
-npm run start
+npm run start:user-service
+npm run start:notification-service
 ```
 
-Приложение по умолчанию запускается на:
+User service по умолчанию запускается на:
 
 ```text
 http://localhost:3000
+```
+
+Notification service по умолчанию запускается на:
+
+```text
+http://localhost:3001
 ```
 
 Health endpoint:
@@ -126,6 +151,51 @@ Swagger:
 
 ```text
 http://localhost:3000/docs
+```
+
+WebSocket notification-service:
+
+```text
+ws://localhost:3001/socket.io/?EIO=4&transport=websocket
+```
+
+При подключении передать access JWT через заголовок
+`Authorization: Bearer <token>` или через Socket.io auth `token`. После успешной
+аутентификации сокет попадает в комнату с id пользователя и слушает событие
+`notification`.
+
+События `notification` ожидают Socket.io callback ack. Если клиент не подтвердил
+получение, уведомление остаётся не подтверждённым в MongoDB и будет
+переотправлено при следующем подключении пользователя. Также доступен ручной ack:
+
+```text
+notification:ack
+```
+
+Payload:
+
+```json
+{
+  "notificationId": "transfer-id"
+}
+```
+
+Локальный playground для проверки:
+
+```text
+docs/websocket-playground.html
+```
+
+Playground получает имена Socket.io событий с backend endpoint:
+
+```text
+GET http://localhost:3001/api/notifications/websocket-events
+```
+
+Тестовая ручная отправка уведомления:
+
+```text
+POST http://localhost:3001/api/notifications/send
 ```
 
 ## Балансы и фоновые задачи
@@ -158,13 +228,13 @@ bulk SQL update, после чего инвалидируются связанн
 Создать новую миграцию:
 
 ```bash
-npm run migration:generate -- src/database/migrations/MigrationName
+npm run migration:generate -- apps/user-service/src/database/migrations/MigrationName
 ```
 
 Пример:
 
 ```bash
-npm run migration:generate -- src/database/migrations/CreateUsersTable
+npm run migration:generate -- apps/user-service/src/database/migrations/CreateUsersTable
 ```
 
 Накатить миграции:

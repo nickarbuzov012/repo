@@ -1,12 +1,13 @@
 import { createHmac } from 'crypto';
-import { UserEntity } from '../../src/features/users/entities/user.entity';
-import { AvatarEntity } from '../../src/features/users/entities/avatar.entity';
+import { UserEntity } from '../../apps/user-service/src/features/users/entities/user.entity';
+import { AvatarEntity } from '../../apps/user-service/src/features/users/entities/avatar.entity';
+import { FileEntity } from '../../apps/user-service/src/providers/files/entities/file.entity';
 import {
   MinorUnitSchema,
   POSTGRES_INTEGER_MAX,
-} from '../../src/common/validation/minor-unit.schema';
-import { CacheService } from '../../src/providers/cache/cache.service';
-import { E2eTestApp, createE2eTestApp, requestJson } from './test-app';
+} from '../../apps/user-service/src/common/validation/minor-unit.schema';
+import { CacheService } from '../../apps/user-service/src/providers/cache/cache.service';
+import { type E2eTestApp, createE2eTestApp, requestJson } from './test-app';
 
 interface AuthResponseBody {
   access_token: string;
@@ -133,10 +134,7 @@ function createExpiredAccessToken(userId: string): string {
       exp: now - 1,
     }),
   ).toString('base64url');
-  const signature = createHmac(
-    'sha256',
-    process.env.JWT_ACCESS_SECRET!,
-  )
+  const signature = createHmac('sha256', process.env.JWT_ACCESS_SECRET!)
     .update(`${header}.${payload}`)
     .digest('base64url');
 
@@ -900,10 +898,7 @@ describe('application endpoints (e2e)', () => {
       avatars.push(upload.body);
     }
 
-    const sixthUpload = await uploadAvatar(
-      testApp.baseUrl,
-      owner.access_token,
-    );
+    const sixthUpload = await uploadAvatar(testApp.baseUrl, owner.access_token);
     expect(sixthUpload.status).toBe(409);
 
     const unsupportedFile = await uploadAvatar(
@@ -937,10 +932,7 @@ describe('application endpoints (e2e)', () => {
     );
     expect(ownerDelete.status).toBe(204);
 
-    const replacement = await uploadAvatar(
-      testApp.baseUrl,
-      owner.access_token,
-    );
+    const replacement = await uploadAvatar(testApp.baseUrl, owner.access_token);
     expect(replacement.status).toBe(201);
 
     const repeatedDelete = await requestJson(
@@ -959,6 +951,7 @@ describe('application endpoints (e2e)', () => {
   it('lists active users with all filters, latest avatar and stable pagination', async () => {
     const usersRepository = testApp.dataSource.getRepository(UserEntity);
     const avatarsRepository = testApp.dataSource.getRepository(AvatarEntity);
+    const filesRepository = testApp.dataSource.getRepository(FileEntity);
     const passwordHash = 'not-used-by-this-test';
 
     const users = await usersRepository.save([
@@ -995,24 +988,39 @@ describe('application endpoints (e2e)', () => {
     const baseDate = new Date('2026-01-01T00:00:00.000Z');
 
     for (const user of users) {
-      await avatarsRepository.save(
-        [0, 1, 2].map((index) =>
-          avatarsRepository.create({
-            userId: user.id,
-            fileName: `active-query/${user.id}/${index}.png`,
+      for (const index of [0, 1, 2]) {
+        const file = await filesRepository.save(
+          filesRepository.create({
+            storageKey: `active-query/${user.id}/${index}.png`,
             mimeType: 'image/png',
             size: 100 + index,
+            hash: `${user.id}-${index}`,
+            hashAlgorithm: 'sha256',
+          }),
+        );
+
+        await avatarsRepository.save(
+          avatarsRepository.create({
+            userId: user.id,
+            fileId: file.id,
             createdAt: new Date(baseDate.getTime() + index * 1000),
           }),
-        ),
-      );
+        );
+      }
     }
+    const deletedFile = await filesRepository.save(
+      filesRepository.create({
+        storageKey: `active-query/${activeA.id}/deleted.png`,
+        mimeType: 'image/png',
+        size: 999,
+        hash: `${activeA.id}-deleted`,
+        hashAlgorithm: 'sha256',
+      }),
+    );
     await avatarsRepository.save(
       avatarsRepository.create({
         userId: activeA.id,
-        fileName: `active-query/${activeA.id}/deleted.png`,
-        mimeType: 'image/png',
-        size: 999,
+        fileId: deletedFile.id,
         createdAt: new Date(baseDate.getTime() + 10_000),
         deletedAt: new Date(baseDate.getTime() + 11_000),
       }),
