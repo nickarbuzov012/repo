@@ -1,54 +1,55 @@
-import { BadRequestException, Injectable, NestMiddleware } from '@nestjs/common';
-import { zRegistry } from './z-registry';
+import {
+  BadRequestException,
+  Injectable,
+  NestMiddleware,
+} from '@nestjs/common';
+import { findZRouteEntry } from './route-registry.matcher';
 
-const GLOBAL_PREFIX = 'api';
+interface ZodValidationRequest {
+  method?: string;
+  path?: string;
+  params?: Record<string, unknown>;
+  query?: Record<string, unknown>;
+  body?: unknown;
+}
 
-type Entry = {
-  method: string;
-  routePattern: string;
-  conf: any;
-  match: (path: string) => false | Record<string, string>;
-};
+interface ValidationIssue {
+  path?: Array<string | number>;
+  message: string;
+}
 
-const index: Entry[] = Object.entries(zRegistry).map(([key, conf]) => {
-  const [method, ...rest] = key.split(' ');
-  const routePattern = rest.join(' ').trim();
-
-  return {
-    method: method.toUpperCase(),
-    routePattern,
-    conf,
-    match: createMatcher(routePattern),
-  };
-});
+interface ValidationError {
+  issues?: ValidationIssue[];
+  errors?: ValidationIssue[];
+}
 
 @Injectable()
 export class ZodRouteValidationMiddleware implements NestMiddleware {
-  use(req: any, _res: any, next: (error?: unknown) => void): void {
+  use(
+    req: ZodValidationRequest,
+    _res: unknown,
+    next: (error?: unknown) => void,
+  ): void {
     try {
       const method = String(req.method || '').toUpperCase();
-      const path = stripPrefix(req.path || '/', GLOBAL_PREFIX);
-      const entry = index.find(
-        (item) => item.method === method && item.match(path) !== false,
-      );
+      const route = findZRouteEntry(method, req.path || '/');
 
-      if (!entry) {
+      if (!route) {
         next();
         return;
       }
 
-      const params = entry.match(path);
-      if (params) {
-        Object.assign(req.params, params);
-      }
+      req.params ??= {};
+      Object.assign(req.params, route.params);
 
-      const { conf } = entry;
+      const { conf } = route.entry;
 
       if (conf.params) {
         Object.assign(req.params, conf.params.parse(req.params ?? {}));
       }
 
       if (conf.query) {
+        req.query ??= {};
         Object.assign(req.query, conf.query.parse(req.query ?? {}));
       }
 
@@ -61,11 +62,14 @@ export class ZodRouteValidationMiddleware implements NestMiddleware {
       }
 
       next();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const validationError = error as ValidationError;
+      const issues = validationError.issues ?? validationError.errors ?? [];
+
       next(
         new BadRequestException({
           message: 'Validation failed',
-          errors: (error?.issues ?? error?.errors ?? []).map((issue: any) => ({
+          errors: issues.map((issue) => ({
             path: Array.isArray(issue.path) ? issue.path.join('.') : '',
             message: issue.message,
           })),
@@ -73,41 +77,4 @@ export class ZodRouteValidationMiddleware implements NestMiddleware {
       );
     }
   }
-}
-
-function stripPrefix(path: string, prefix: string): string {
-  const normalizedPrefix = prefix.startsWith('/') ? prefix : `/${prefix}`;
-  return path.startsWith(normalizedPrefix)
-    ? path.slice(normalizedPrefix.length) || '/'
-    : path;
-}
-
-function createMatcher(pattern: string): Entry['match'] {
-  const patternParts = pattern.split('/').filter(Boolean);
-
-  return (path: string) => {
-    const pathParts = path.split('/').filter(Boolean);
-
-    if (pathParts.length !== patternParts.length) {
-      return false;
-    }
-
-    const params: Record<string, string> = {};
-
-    for (let index = 0; index < patternParts.length; index += 1) {
-      const patternPart = patternParts[index];
-      const pathPart = pathParts[index];
-
-      if (patternPart.startsWith(':')) {
-        params[patternPart.slice(1)] = decodeURIComponent(pathPart);
-        continue;
-      }
-
-      if (patternPart !== pathPart) {
-        return false;
-      }
-    }
-
-    return params;
-  };
 }

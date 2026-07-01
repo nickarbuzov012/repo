@@ -1,15 +1,20 @@
 import {
   OpenAPIRegistry,
   OpenApiGeneratorV3,
-  RouteConfig,
+  type RouteConfig,
 } from '@asteasolutions/zod-to-openapi';
-import { OpenAPIObject } from '@nestjs/swagger';
+import { type OpenAPIObject } from '@nestjs/swagger';
 import { z } from './zod';
 import {
-  ZResponseConfig,
-  ZRouteConfig,
+  type ZResponseConfig,
+  type ZRouteConfig,
   zRegistry,
 } from '../validation/z-registry';
+
+type RouteRequest = NonNullable<RouteConfig['request']>;
+type RouteParameter = NonNullable<RouteRequest['query']>;
+type RouteBody = NonNullable<RouteRequest['body']>;
+type RouteResponse = NonNullable<RouteConfig['responses']>[string];
 
 const ErrorResponseSchema = z
   .object({
@@ -31,10 +36,17 @@ const ErrorResponseSchema = z
   })
   .meta({ id: 'ErrorResponse' });
 
-function jsonBody(schema: z.ZodType) {
+function jsonBody(schema: z.ZodType): RouteBody {
   return {
     required: true,
     content: { 'application/json': { schema } },
+  };
+}
+
+function multipartBody(schema: z.ZodType): RouteBody {
+  return {
+    required: true,
+    content: { 'multipart/form-data': { schema } },
   };
 }
 
@@ -45,22 +57,26 @@ function request(config: ZRouteConfig): RouteConfig['request'] {
     result.body = jsonBody(config.body);
   }
 
+  if (config.multipartBody) {
+    result.body = multipartBody(config.multipartBody);
+  }
+
   if (config.query) {
-    result.query = config.query;
+    result.query = config.query as RouteParameter;
   }
 
   if (config.params) {
-    result.params = config.params;
+    result.params = config.params as RouteParameter;
   }
 
   if (config.cookies) {
-    result.cookies = config.cookies;
+    result.cookies = config.cookies as RouteParameter;
   }
 
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
-function jsonResponse(description: string, schema: unknown) {
+function jsonResponse(description: string, schema: unknown): RouteResponse {
   return {
     description,
     content: { 'application/json': { schema: schema as z.ZodType } },
@@ -121,7 +137,10 @@ function createResponses(config: ZRouteConfig): RouteConfig['responses'] {
 
   for (const item of toResponseList(config.res)) {
     const status = String(item.status ?? 200);
-    responses[status] = jsonResponse(item.description ?? 'Success', item.schema);
+    responses[status] = jsonResponse(
+      item.description ?? 'Success',
+      item.schema,
+    );
   }
 
   responses['400'] = jsonResponse('Validation error', ErrorResponseSchema);

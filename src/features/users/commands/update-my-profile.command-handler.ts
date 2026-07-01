@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, Logger, NotFoundException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, Not, Repository } from 'typeorm';
@@ -9,6 +9,7 @@ import {
 import { UserEntity } from '../entities/user.entity';
 import { toUserProfile } from '../users.mapper';
 import { PasswordService } from '../../auth/services/password.service';
+import { UserCacheService } from '../../../providers/cache/user-cache.service';
 
 export class UpdateMyProfileCommand {
   constructor(
@@ -18,13 +19,17 @@ export class UpdateMyProfileCommand {
 }
 
 @CommandHandler(UpdateMyProfileCommand)
-export class UpdateMyProfileHandler
-  implements ICommandHandler<UpdateMyProfileCommand, UserProfile>
-{
+export class UpdateMyProfileHandler implements ICommandHandler<
+  UpdateMyProfileCommand,
+  UserProfile
+> {
+  private readonly logger = new Logger(UpdateMyProfileHandler.name);
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
     private readonly passwordService: PasswordService,
+    private readonly cacheService: UserCacheService,
   ) {}
 
   async execute(command: UpdateMyProfileCommand): Promise<UserProfile> {
@@ -59,7 +64,9 @@ export class UpdateMyProfileHandler
       });
 
       if (existingUser) {
-        throw new ConflictException('User with this login or email already exists');
+        throw new ConflictException(
+          'User with this login or email already exists',
+        );
       }
     }
 
@@ -71,6 +78,9 @@ export class UpdateMyProfileHandler
       user.passwordHash = await this.passwordService.hash(password);
     }
 
-    return toUserProfile(await this.usersRepository.save(user));
+    const profile = toUserProfile(await this.usersRepository.save(user));
+    await this.cacheService.invalidateUser(command.userId);
+    this.logger.log(`Updated profile: userId=${command.userId}`);
+    return profile;
   }
 }

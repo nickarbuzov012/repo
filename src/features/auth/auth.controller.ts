@@ -6,7 +6,6 @@ import {
   Req,
   Res,
   UnauthorizedException,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
@@ -14,7 +13,6 @@ import { ZodResponseInterceptor } from '../../common/serialization/zod-response.
 import { readCookie } from '../../common/utils/cookies';
 import { ZodValidationPipe } from '../../common/validation/zod-validation.pipe';
 import { AuthRequestUser } from './auth-request-user';
-import { AuthGuard } from './auth.guard';
 import { LoginUserCommand } from './commands/login-user.command-handler';
 import { RefreshTokenCommand } from './commands/refresh-token.command-handler';
 import { RegisterUserCommand } from './commands/register-user.command-handler';
@@ -58,9 +56,7 @@ export class AuthController {
     const authResponse = await this.commandBus.execute<
       RegisterUserCommand,
       TokenPair
-    >(
-      new RegisterUserCommand(body),
-    );
+    >(new RegisterUserCommand(body));
 
     setRefreshTokenCookie(response, authResponse.refresh_token);
     return { access_token: authResponse.access_token };
@@ -75,9 +71,7 @@ export class AuthController {
     const authResponse = await this.commandBus.execute<
       LoginUserCommand,
       TokenPair
-    >(
-      new LoginUserCommand(body),
-    );
+    >(new LoginUserCommand(body));
 
     setRefreshTokenCookie(response, authResponse.refresh_token);
     return { access_token: authResponse.access_token };
@@ -92,7 +86,8 @@ export class AuthController {
     @Res({ passthrough: true }) response: CookieResponse,
   ): Promise<AuthResponse> {
     const refreshToken =
-      body.refresh_token ?? readCookie(request.header('cookie'), 'refresh_token');
+      body.refresh_token ??
+      readCookie(request.header('cookie'), 'refresh_token');
 
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token is required');
@@ -101,16 +96,13 @@ export class AuthController {
     const authResponse = await this.commandBus.execute<
       RefreshTokenCommand,
       TokenPair
-    >(
-      new RefreshTokenCommand(refreshToken),
-    );
+    >(new RefreshTokenCommand(refreshToken));
 
     setRefreshTokenCookie(response, authResponse.refresh_token);
     return { access_token: authResponse.access_token };
   }
 
   @Get('me')
-  @UseGuards(AuthGuard)
   @UseInterceptors(new ZodResponseInterceptor(MeResponseSchema))
   async me(@Req() request: AuthenticatedHttpRequest): Promise<MeResponse> {
     return this.queryBus.execute<GetMeQuery, MeResponse>(

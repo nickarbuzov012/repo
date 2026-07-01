@@ -1,12 +1,18 @@
 import { createHmac } from 'crypto';
 import { UserEntity } from '../../src/features/users/entities/user.entity';
+import { AvatarEntity } from '../../src/features/users/entities/avatar.entity';
+import {
+  MinorUnitSchema,
+  POSTGRES_INTEGER_MAX,
+} from '../../src/common/validation/minor-unit.schema';
+import { CacheService } from '../../src/providers/cache/cache.service';
 import { E2eTestApp, createE2eTestApp, requestJson } from './test-app';
 
 interface AuthResponseBody {
   access_token: string;
 }
 
-interface MeResponseBody {
+interface UserProfileResponseBody {
   id: string;
   login: string;
   email: string;
@@ -17,12 +23,42 @@ interface MeResponseBody {
   updatedAt: string;
 }
 
+interface MeResponseBody extends UserProfileResponseBody {
+  balance: number;
+}
+
 interface UsersListResponseBody {
-  items: MeResponseBody[];
+  items: UserProfileResponseBody[];
   page: number;
   limit: number;
   total: number;
   pages: number;
+}
+
+interface AvatarResponseBody {
+  id: string;
+  fileName: string;
+  mimeType: 'image/jpeg' | 'image/png';
+  size: number;
+  createdAt: string;
+}
+
+interface ActiveUsersResponseBody {
+  items: Array<{
+    id: string;
+    login: string;
+    age: number;
+    description: string;
+    latestAvatar: AvatarResponseBody;
+  }>;
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+interface BalanceResetResponseBody {
+  jobId: string;
 }
 
 const registerPayload = {
@@ -46,6 +82,31 @@ async function registerUser(
 
   expect(response.status).toBe(201);
   return response.body;
+}
+
+async function uploadAvatar(
+  baseUrl: string,
+  accessToken: string,
+  mimeType = 'image/png',
+): Promise<{ status: number; body: AvatarResponseBody }> {
+  const form = new FormData();
+  form.append(
+    'file',
+    new Blob([Buffer.from('avatar-content')], { type: mimeType }),
+    mimeType === 'image/png' ? 'avatar.png' : 'avatar.txt',
+  );
+
+  const response = await fetch(`${baseUrl}/api/profile/my/avatars`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${accessToken}` },
+    body: form,
+  });
+  const text = await response.text();
+
+  return {
+    status: response.status,
+    body: (text ? JSON.parse(text) : undefined) as AvatarResponseBody,
+  };
 }
 
 function expectRefreshCookie(response: { headers: Headers }): string {
@@ -80,6 +141,27 @@ function createExpiredAccessToken(userId: string): string {
     .digest('base64url');
 
   return `${header}.${payload}.${signature}`;
+}
+
+async function waitForUserBalance(
+  testApp: E2eTestApp,
+  userId: string,
+  expectedBalance: number,
+): Promise<void> {
+  const usersRepository = testApp.dataSource.getRepository(UserEntity);
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const user = await usersRepository.findOneByOrFail({ id: userId });
+
+    if (user.balance === expectedBalance) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  const user = await usersRepository.findOneByOrFail({ id: userId });
+  expect(user.balance).toBe(expectedBalance);
 }
 
 describe('application endpoints (e2e)', () => {
@@ -142,10 +224,30 @@ describe('application endpoints (e2e)', () => {
       email: 'john@example.com',
       age: registerPayload.age,
       description: registerPayload.description,
+      balance: 0,
       roles: ['user'],
       createdAt: expect.any(String),
       updatedAt: expect.any(String),
     });
+
+    await testApp.dataSource
+      .getRepository(UserEntity)
+      .update({ id: me.body.id }, { balance: 2051 });
+    await testApp.app.get(CacheService).invalidateUser(me.body.id);
+
+    const meWithBalance = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: {
+          authorization: `Bearer ${registration.body.access_token}`,
+        },
+      },
+    );
+
+    expect(meWithBalance.status).toBe(200);
+    expect(meWithBalance.body.balance).toBe(2051);
 
     const expiredAccess = await requestJson(
       testApp.baseUrl,
@@ -291,6 +393,256 @@ describe('application endpoints (e2e)', () => {
     });
   });
 
+  it('validates monetary values as PostgreSQL integer minor units', () => {
+    expect(MinorUnitSchema.safeParse(2051).success).toBe(true);
+    expect(MinorUnitSchema.safeParse(1.5).success).toBe(false);
+    expect(MinorUnitSchema.safeParse(-1).success).toBe(false);
+    expect(MinorUnitSchema.safeParse(POSTGRES_INTEGER_MAX + 1).success).toBe(
+      false,
+    );
+  });
+
+  it('transfers balance transactionally between active users', async () => {
+    const usersRepository = testApp.dataSource.getRepository(UserEntity);
+    const cacheService = testApp.app.get(CacheService);
+    const sender = await registerUser(testApp.baseUrl, {
+      login: 'transfer-sender',
+      email: 'transfer-sender@example.com',
+      password: 'password123',
+      age: 30,
+      description: 'Transfer sender',
+    });
+    const recipient = await registerUser(testApp.baseUrl, {
+      login: 'transfer-recipient',
+      email: 'transfer-recipient@example.com',
+      password: 'password123',
+      age: 31,
+      description: 'Transfer recipient',
+    });
+    const secondRecipient = await registerUser(testApp.baseUrl, {
+      login: 'transfer-recipient-2',
+      email: 'transfer-recipient-2@example.com',
+      password: 'password123',
+      age: 32,
+      description: 'Transfer recipient 2',
+    });
+
+    const senderMe = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+      },
+    );
+    const recipientMe = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${recipient.access_token}` },
+      },
+    );
+    const secondRecipientMe = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${secondRecipient.access_token}` },
+      },
+    );
+
+    await usersRepository.update({ id: senderMe.body.id }, { balance: 1000 });
+    await usersRepository.update({ id: recipientMe.body.id }, { balance: 100 });
+    await Promise.all([
+      cacheService.invalidateUser(senderMe.body.id),
+      cacheService.invalidateUser(recipientMe.body.id),
+    ]);
+
+    const transfer = await requestJson(
+      testApp.baseUrl,
+      'POST',
+      '/api/users/transfer',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: recipientMe.body.id,
+          amountCents: 250,
+        },
+      },
+    );
+
+    expect(transfer.status).toBe(204);
+
+    const senderAfterTransfer = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+      },
+    );
+    const recipientAfterTransfer = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${recipient.access_token}` },
+      },
+    );
+
+    expect(senderAfterTransfer.body.balance).toBe(750);
+    expect(recipientAfterTransfer.body.balance).toBe(350);
+
+    const insufficientFunds = await requestJson(
+      testApp.baseUrl,
+      'POST',
+      '/api/users/transfer',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: recipientMe.body.id,
+          amountCents: 1000,
+        },
+      },
+    );
+
+    expect(insufficientFunds.status).toBe(409);
+    await expect(
+      usersRepository.findOneByOrFail({ id: senderMe.body.id }),
+    ).resolves.toMatchObject({ balance: 750 });
+    await expect(
+      usersRepository.findOneByOrFail({ id: recipientMe.body.id }),
+    ).resolves.toMatchObject({ balance: 350 });
+
+    const selfTransfer = await requestJson(
+      testApp.baseUrl,
+      'POST',
+      '/api/users/transfer',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: senderMe.body.id,
+          amountCents: 1,
+        },
+      },
+    );
+
+    expect(selfTransfer.status).toBe(400);
+
+    const missingRecipient = await requestJson(
+      testApp.baseUrl,
+      'POST',
+      '/api/users/transfer',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: '1305f2ff-93c7-45aa-bc66-4f74b4ee2596',
+          amountCents: 1,
+        },
+      },
+    );
+
+    expect(missingRecipient.status).toBe(404);
+
+    const invalidAmount = await requestJson(
+      testApp.baseUrl,
+      'POST',
+      '/api/users/transfer',
+      {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: recipientMe.body.id,
+          amountCents: 0,
+        },
+      },
+    );
+
+    expect(invalidAmount.status).toBe(400);
+
+    const concurrentTransfers = await Promise.all([
+      requestJson(testApp.baseUrl, 'POST', '/api/users/transfer', {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: recipientMe.body.id,
+          amountCents: 600,
+        },
+      }),
+      requestJson(testApp.baseUrl, 'POST', '/api/users/transfer', {
+        headers: { authorization: `Bearer ${sender.access_token}` },
+        body: {
+          recipientId: secondRecipientMe.body.id,
+          amountCents: 600,
+        },
+      }),
+    ]);
+
+    expect(concurrentTransfers.map(({ status }) => status).sort()).toEqual([
+      204, 409,
+    ]);
+    await expect(
+      usersRepository.findOneByOrFail({ id: senderMe.body.id }),
+    ).resolves.toMatchObject({ balance: 150 });
+  });
+
+  it('enqueues and processes asynchronous balance reset', async () => {
+    const usersRepository = testApp.dataSource.getRepository(UserEntity);
+    const auth = await registerUser(testApp.baseUrl, {
+      login: 'balance-reset-user',
+      email: 'balance-reset-user@example.com',
+      password: 'password123',
+      age: 33,
+      description: 'Balance reset user',
+    });
+    const me = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${auth.access_token}` },
+      },
+    );
+
+    await usersRepository.update({ id: me.body.id }, { balance: 777 });
+    await testApp.app.get(CacheService).invalidateUser(me.body.id);
+
+    const meBeforeReset = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${auth.access_token}` },
+      },
+    );
+
+    expect(meBeforeReset.body.balance).toBe(777);
+
+    const reset = await requestJson<BalanceResetResponseBody>(
+      testApp.baseUrl,
+      'POST',
+      '/api/balances/reset',
+      {
+        headers: { authorization: `Bearer ${auth.access_token}` },
+      },
+    );
+
+    expect(reset.status).toBe(202);
+    expect(reset.body).toEqual({ jobId: expect.any(String) });
+
+    await waitForUserBalance(testApp, me.body.id, 0);
+
+    const meAfterReset = await requestJson<MeResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/auth/me',
+      {
+        headers: { authorization: `Bearer ${auth.access_token}` },
+      },
+    );
+
+    expect(meAfterReset.body.balance).toBe(0);
+  });
+
   it('rejects duplicate registration', async () => {
     const response = await requestJson(
       testApp.baseUrl,
@@ -396,7 +748,7 @@ describe('application endpoints (e2e)', () => {
       description: 'Original profile',
     });
 
-    const updated = await requestJson<MeResponseBody>(
+    const updated = await requestJson<UserProfileResponseBody>(
       testApp.baseUrl,
       'PATCH',
       '/api/profile/my',
@@ -514,5 +866,225 @@ describe('application endpoints (e2e)', () => {
     );
 
     expect(loginDeleted.status).toBe(401);
+  });
+
+  it('uploads at most five active avatars and soft deletes only owned avatars', async () => {
+    const owner = await registerUser(testApp.baseUrl, {
+      login: 'avatar-owner',
+      email: 'avatar-owner@example.com',
+      password: 'password123',
+      age: 24,
+      description: 'Avatar owner',
+    });
+    const stranger = await registerUser(testApp.baseUrl, {
+      login: 'avatar-stranger',
+      email: 'avatar-stranger@example.com',
+      password: 'password123',
+      age: 27,
+      description: 'Avatar stranger',
+    });
+
+    const avatars: AvatarResponseBody[] = [];
+
+    for (let index = 0; index < 5; index += 1) {
+      const upload = await uploadAvatar(testApp.baseUrl, owner.access_token);
+
+      expect(upload.status).toBe(201);
+      expect(upload.body).toMatchObject({
+        id: expect.any(String),
+        fileName: expect.stringMatching(/\.png$/),
+        mimeType: 'image/png',
+        size: expect.any(Number),
+        createdAt: expect.any(String),
+      });
+      avatars.push(upload.body);
+    }
+
+    const sixthUpload = await uploadAvatar(
+      testApp.baseUrl,
+      owner.access_token,
+    );
+    expect(sixthUpload.status).toBe(409);
+
+    const unsupportedFile = await uploadAvatar(
+      testApp.baseUrl,
+      owner.access_token,
+      'text/plain',
+    );
+    expect(unsupportedFile.status).toBe(400);
+
+    const foreignDelete = await requestJson(
+      testApp.baseUrl,
+      'DELETE',
+      `/api/profile/my/avatars/${avatars[0].id}`,
+      {
+        headers: {
+          authorization: `Bearer ${stranger.access_token}`,
+        },
+      },
+    );
+    expect(foreignDelete.status).toBe(404);
+
+    const ownerDelete = await requestJson(
+      testApp.baseUrl,
+      'DELETE',
+      `/api/profile/my/avatars/${avatars[0].id}`,
+      {
+        headers: {
+          authorization: `Bearer ${owner.access_token}`,
+        },
+      },
+    );
+    expect(ownerDelete.status).toBe(204);
+
+    const replacement = await uploadAvatar(
+      testApp.baseUrl,
+      owner.access_token,
+    );
+    expect(replacement.status).toBe(201);
+
+    const repeatedDelete = await requestJson(
+      testApp.baseUrl,
+      'DELETE',
+      `/api/profile/my/avatars/${avatars[0].id}`,
+      {
+        headers: {
+          authorization: `Bearer ${owner.access_token}`,
+        },
+      },
+    );
+    expect(repeatedDelete.status).toBe(404);
+  });
+
+  it('lists active users with all filters, latest avatar and stable pagination', async () => {
+    const usersRepository = testApp.dataSource.getRepository(UserEntity);
+    const avatarsRepository = testApp.dataSource.getRepository(AvatarEntity);
+    const passwordHash = 'not-used-by-this-test';
+
+    const users = await usersRepository.save([
+      usersRepository.create({
+        login: 'active-in-range-a',
+        email: 'active-a@example.com',
+        passwordHash,
+        age: 30,
+        description: 'Active A',
+      }),
+      usersRepository.create({
+        login: 'active-in-range-b',
+        email: 'active-b@example.com',
+        passwordHash,
+        age: 40,
+        description: 'Active B',
+      }),
+      usersRepository.create({
+        login: 'active-outside-age',
+        email: 'active-outside@example.com',
+        passwordHash,
+        age: 17,
+        description: 'Too young',
+      }),
+      usersRepository.create({
+        login: 'active-empty-description',
+        email: 'active-empty@example.com',
+        passwordHash,
+        age: 35,
+        description: '',
+      }),
+    ]);
+    const [activeA, activeB, outsideAge, emptyDescription] = users;
+    const baseDate = new Date('2026-01-01T00:00:00.000Z');
+
+    for (const user of users) {
+      await avatarsRepository.save(
+        [0, 1, 2].map((index) =>
+          avatarsRepository.create({
+            userId: user.id,
+            fileName: `active-query/${user.id}/${index}.png`,
+            mimeType: 'image/png',
+            size: 100 + index,
+            createdAt: new Date(baseDate.getTime() + index * 1000),
+          }),
+        ),
+      );
+    }
+    await avatarsRepository.save(
+      avatarsRepository.create({
+        userId: activeA.id,
+        fileName: `active-query/${activeA.id}/deleted.png`,
+        mimeType: 'image/png',
+        size: 999,
+        createdAt: new Date(baseDate.getTime() + 10_000),
+        deletedAt: new Date(baseDate.getTime() + 11_000),
+      }),
+    );
+
+    const login = await requestJson<AuthResponseBody>(
+      testApp.baseUrl,
+      'POST',
+      '/api/auth/login',
+      {
+        body: {
+          login: registerPayload.login,
+          password: registerPayload.password,
+        },
+      },
+    );
+    expect(login.status).toBe(201);
+    const accessToken = login.body.access_token;
+    const firstPage = await requestJson<ActiveUsersResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/users/active?minAge=29&maxAge=45&page=1&limit=1',
+      { headers: { authorization: `Bearer ${accessToken}` } },
+    );
+
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body).toMatchObject({
+      page: 1,
+      limit: 1,
+      total: 2,
+      pages: 2,
+    });
+    expect(firstPage.body.items).toHaveLength(1);
+
+    const secondPage = await requestJson<ActiveUsersResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/users/active?minAge=29&maxAge=45&page=2&limit=1',
+      { headers: { authorization: `Bearer ${accessToken}` } },
+    );
+    const repeatedFirstPage = await requestJson<ActiveUsersResponseBody>(
+      testApp.baseUrl,
+      'GET',
+      '/api/users/active?minAge=29&maxAge=45&page=1&limit=1',
+      { headers: { authorization: `Bearer ${accessToken}` } },
+    );
+
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.body.items).toHaveLength(1);
+    expect(repeatedFirstPage.body.items[0].id).toBe(firstPage.body.items[0].id);
+    expect(
+      new Set(
+        [...firstPage.body.items, ...secondPage.body.items].map(({ id }) => id),
+      ),
+    ).toEqual(new Set([activeA.id, activeB.id]));
+    const activeAResult = [
+      ...firstPage.body.items,
+      ...secondPage.body.items,
+    ].find(({ id }) => id === activeA.id);
+    expect(activeAResult?.latestAvatar.fileName).toBe(
+      `active-query/${activeA.id}/2.png`,
+    );
+    expect([outsideAge.id, emptyDescription.id]).not.toContain(
+      firstPage.body.items[0].id,
+    );
+
+    const invalidRange = await requestJson(
+      testApp.baseUrl,
+      'GET',
+      '/api/users/active?minAge=45&maxAge=29',
+      { headers: { authorization: `Bearer ${accessToken}` } },
+    );
+    expect(invalidRange.status).toBe(400);
   });
 });

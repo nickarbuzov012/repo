@@ -6,10 +6,17 @@ export const validators = {
   },
 };
 
+const publicPolicy = {
+  isConfigured: true,
+  isProtected: false,
+  allowRoles: [],
+};
+
 export const healthZSlice = {
   'GET /health': {
     tags: ['Health'],
     summary: 'Check application health',
+    policy: publicPolicy,
     res: { status: 200, schema: validators.check.res },
   },
 };

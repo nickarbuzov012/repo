@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { Logger, UnauthorizedException } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,6 +14,8 @@ export class RefreshTokenCommand {
 export class RefreshTokenHandler
   implements ICommandHandler<RefreshTokenCommand, TokenPair>
 {
+  private readonly logger = new Logger(RefreshTokenHandler.name);
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly usersRepository: Repository<UserEntity>,
@@ -48,6 +50,8 @@ export class RefreshTokenHandler
         expiresAt: new Date(payload.exp * 1000),
       }),
     );
+
+    this.logger.log(`Rotated refresh token: userId=${user.id}`);
 
     return this.tokenService.issueTokenPair(user.id, user.roles);
   }

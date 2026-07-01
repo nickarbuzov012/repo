@@ -5,7 +5,9 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { AvatarEntity } from './avatar.entity';
 
 export enum UserRole {
   User = 'user',
@@ -32,6 +34,9 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 1000 })
   description: string;
 
+  @Column({ type: 'integer', default: 0 })
+  balance: number;
+
   @Column({
     type: 'enum',
     enum: UserRole,
@@ -39,6 +44,9 @@ export class UserEntity {
     default: [UserRole.User],
   })
   roles: UserRole[];
+
+  @OneToMany(() => AvatarEntity, (avatar) => avatar.user)
+  avatars: AvatarEntity[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

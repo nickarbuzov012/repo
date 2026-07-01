@@ -1,6 +1,7 @@
 ﻿# Users API
 
-REST API на NestJS, PostgreSQL, TypeORM и CQRS.
+REST API на NestJS, PostgreSQL, TypeORM и CQRS. Локальная инфраструктура также
+включает Redis, BullMQ-очереди и совместимое с S3 объектное хранилище MinIO.
 
 ## Требования
 
@@ -17,19 +18,24 @@ REST API на NestJS, PostgreSQL, TypeORM и CQRS.
 npm install
 ```
 
+Если `package.json` менялся без установки пакетов, сначала обновить
+`package-lock.json` этой же командой и только потом запускать проверки.
+
 Создать локальный `.env` из примера:
 
 ```bash
 cp .env.example .env
+cp .env.test.example .env.test
 ```
 
 На Windows PowerShell:
 
 ```powershell
 Copy-Item .env.example .env
+Copy-Item .env.test.example .env.test
 ```
 
-## Запуск PostgreSQL и pgAdmin
+## Запуск инфраструктуры
 
 Запустить инфраструктуру:
 
@@ -37,10 +43,17 @@ Copy-Item .env.example .env
 docker compose up -d
 ```
 
+Запустить тестовую БД:
+
+```bash
+docker compose --env-file .env.test -f docker-compose.test.yml up -d
+```
+
 Остановить инфраструктуру:
 
 ```bash
 docker compose down
+docker compose -f docker-compose.test.yml down
 ```
 
 PostgreSQL:
@@ -56,6 +69,23 @@ pgAdmin:
 - URL: `http://localhost:${PGADMIN_PORT}`
 - email: значение `PGADMIN_DEFAULT_EMAIL` из `.env`
 - password: значение `PGADMIN_DEFAULT_PASSWORD` из `.env`
+
+Redis:
+
+- host: `localhost`
+- port: значение `REDIS_PORT` из `.env`
+- используется для кэша пользовательских запросов и BullMQ-очередей
+
+MinIO:
+
+- S3 endpoint: значение `MINIO_ENDPOINT` из `.env`
+- console: `http://localhost:${MINIO_CONSOLE_PORT}`
+- access key: значение `MINIO_ACCESS_KEY` из `.env`
+- secret key: значение `MINIO_SECRET_KEY` из `.env`
+- bucket: значение `MINIO_BUCKET` из `.env`
+
+Bucket создаётся приложением лениво перед первой операцией загрузки. В базе
+данных хранится только сгенерированное имя файла, без endpoint или домена MinIO.
 
 Для подключения сервера в pgAdmin:
 
@@ -98,6 +128,31 @@ Swagger:
 http://localhost:3000/docs
 ```
 
+## Балансы и фоновые задачи
+
+Денежные значения хранятся как целые minor units (`amountCents`, `balance`), без
+дробей.
+
+Ручной асинхронный сброс балансов:
+
+```text
+POST http://localhost:3000/api/balances/reset
+```
+
+Endpoint требует авторизацию и возвращает `202 Accepted`:
+
+```json
+{
+  "jobId": "12"
+}
+```
+
+Сама работа выполняется в BullMQ worker: все ненулевые балансы сбрасываются одним
+bulk SQL update, после чего инвалидируются связанные кэши. При старте приложения
+также регистрируется repeatable job, который выполняет такой же сброс каждые 10
+минут. Повторная регистрация при рестарте использует стабильный `jobId`, чтобы не
+создавать дубли расписания.
+
 ## Миграции
 
 Создать новую миграцию:
@@ -127,7 +182,9 @@ docker compose up -d
 ## Проверка перед review
 
 ```bash
+npm install
 npm run build
+npm run lint
 npm test
 ```
 
@@ -136,3 +193,5 @@ npm test
 - `GET http://localhost:3000/api/health`
 - `http://localhost:3000/docs`
 - `http://localhost:5050`
+- `http://localhost:9001`
+- `POST http://localhost:3000/api/balances/reset` возвращает `202 Accepted`
